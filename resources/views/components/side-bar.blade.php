@@ -106,7 +106,7 @@
                 </li>
                 @endcanany
 
-                @can('access billing')
+                @can('generate final bill')
                 <li>
                     <a href="{{ route('billing.index') }}" class="waves-effect {{ request()->is('billing*') ? 'active' : '' }}">
                         <i class="bi bi-credit-card-2-front-fill text-danger fs-5"></i>

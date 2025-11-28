@@ -91,7 +91,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('users', UserController::class)->except(['show', 'create', 'edit']);
         Route::get('roles', [RolePermissionController::class, 'index'])->name('admin.roles');
         Route::post('roles', [RolePermissionController::class, 'store']);
-        Route::put('roles/{role}', [RolePermissionController::class, 'update']);
+        
 
         Route::resource('lab-tests', LabTestController::class)->except(['show']);
         Route::resource('medicines', MedicineController::class)->except(['show']);
@@ -112,6 +112,7 @@ Route::middleware('auth')->group(function () {
         Route::post('settings', [SettingController::class, 'update']);
         Route::post('settings/custom', [SettingController::class, 'storeCustom']);
         Route::delete('settings/delete/{key}', [SettingController::class, 'delete']);
+        Route::put('roles/{role}', [RolePermissionController::class, 'update']);
     });
 });
 
