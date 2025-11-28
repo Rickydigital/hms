@@ -69,4 +69,42 @@
             </div>
         </form>
     </div>
-</div
+</div>
+
+<script>
+document.getElementById('createUserForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = 'Creating...';
+
+    const formData = new FormData(this);
+
+    fetch('/users', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('Staff created successfully! Login credentials have been sent to their email.');
+            location.reload();
+        } else {
+            alert(data.message || 'Error creating user. Please check the details and try again.');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Something went wrong. Please try again.');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Create User';
+    });
+});
+</script>

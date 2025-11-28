@@ -27,7 +27,7 @@
             </a>
             @endcanany
 
-            @can('access billing')
+            @can('generate final bill')
             <a href="{{ route('billing.index') }}" class="nav-item {{ request()->is('billing*') ? 'active' : '' }}">
                 <i class="bi bi-credit-card-2-front-fill text-danger"></i>
                 <span>Payment</span>
@@ -106,7 +106,7 @@
                 </li>
                 @endcanany
 
-                @can('access billing')
+                @can('generate final bill')
                 <li>
                     <a href="{{ route('billing.index') }}" class="waves-effect {{ request()->is('billing*') ? 'active' : '' }}">
                         <i class="bi bi-credit-card-2-front-fill text-danger fs-5"></i>
@@ -127,7 +127,7 @@
                 @can('enter lab results')
                 <li>
                     <a href="{{ route('lab.index') }}" class="waves-effect {{ request()->is('lab*') ? 'active' : '' }}">
-                        <i class="bi bi-eyedropper text-purple"></i>
+                        <i class="bi bi-vial text-purple"></i>
                         <span>Laboratory</span>
                     </a>
                 </li>

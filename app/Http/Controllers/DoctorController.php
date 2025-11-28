@@ -29,36 +29,37 @@ class DoctorController extends Controller
         });
     }
 
-public function index(Request $request)
-{
-    $todayVisits = Visit::with('patient')
-        ->whereDate('visit_date', today())
-        ->orderBy('visit_time')
-        ->get();
+    public function index(Request $request)
+    {
+        // Show all today's visits (any doctor can see all patients)
+        $todayVisits = Visit::with('patient')
+            ->whereDate('visit_date', today())
+            ->orderBy('visit_time')
+            ->get();
 
-    $visit = null; // ← Critical: always define
+        $visit = null;
 
-    if ($request->filled('patient_id')) {
-    $search = trim($request->patient_id);
+        if ($request->filled('patient_id')) {
+            $patient = Patient::where('patient_id', $request->patient_id)->firstOrFail();
 
-    $patient = Patient::where('patient_id', 'LIKE', "%{$search}%")
-                      ->orWhere('name', 'LIKE', "%{$search}%")
-                      ->first();
+            $visit = Visit::firstOrCreate(
+                [
+                    'patient_id' => $patient->id,
+                    'visit_date' => today(),
+                ],
+                [
+                    'visit_time' => now(),
+                    'registration_amount' => setting('registration_fee', 200),
+                    'status' => 'consulting',
+                    // doctor_id is NO LONGER SET → Any doctor can treat
+                ]
+            );
 
-    if (!$patient) {
-        return back()->withErrors(['patient_id' => "No patient found for: {$search}"]);
+            return redirect()->route('doctor.opd.show', $visit);
+        }
+
+        return view('doctor.opd.index', compact('todayVisits', 'visit'));
     }
-
-    $visit = Visit::updateOrCreate(
-        ['patient_id' => $patient->id, 'visit_date' => today()],
-        ['visit_time' => now(), 'registration_amount' => setting('registration_fee', 200), 'status' => 'consulting']
-    );
-
-    return redirect()->route('doctor.opd.show', $visit);
-}
-
-    return view('doctor.opd.index', compact('todayVisits', 'visit'));
-}
 
     public function show(Visit $visit)
 {
@@ -145,20 +146,20 @@ public function index(Request $request)
         }
     }
 
-   // Medicines – Only save if medicine selected
-if ($hasMedicine) {
-    foreach ($request->medicines as $med) {
-        if (!empty($med['medicine_id'])) {
-            VisitMedicineOrder::create([
-                'visit_id'       => $visit->id,
-                'medicine_id'    => $med['medicine_id'],
-                'dosage'         => $med['dosage'] ?? '',
-                'duration_days'  => $med['duration_days'] ?? 1,
-                'instruction'    => $med['instruction'] ?? '',
-            ]);
+    // Medicines – Only save if medicine selected
+    if ($hasMedicine) {
+        foreach ($request->medicines as $med) {
+            if (!empty($med['medicine_id'])) {
+                VisitMedicineOrder::create([
+                    'visit_id'       => $visit->id,
+                    'medicine_id'    => $med['medicine_id'],
+                    'dosage'         => $med['dosage'] ?? '',
+                    'duration_days'  => $med['duration_days'] ?? 1,
+                    'instruction'    => $med['instruction'] ?? '',
+                ]);
+            }
         }
     }
-}
 
     // Injection & Admission (same as before)
     if ($hasInjection) {

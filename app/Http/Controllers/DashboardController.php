@@ -31,7 +31,7 @@ class DashboardController extends Controller
 
         if ($user->hasRole('Reception')) {
             $data['pendingRegistrations'] = Visit::whereDate('visit_date', $today)
-                ->whereNull('registration_completed_at')
+                ->where('registration_paid', false)  // or whereNull('registration_paid')
                 ->count();
         }
 
