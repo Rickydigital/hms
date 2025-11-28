@@ -64,8 +64,10 @@
                                     <div class="col-lg-8">
                                         <h5 class="fw-bold text-dark mb-3">
                                             {{ $medicine->medicine_name }}
-                                            @if($medicine->generic_name)
-                                                <span class="text-success fw-normal">• {{ $medicine->generic_name }}</span>
+                                            @if($medicine->price > 0)
+                                                <span class="text-success fw-normal">
+                                                    • {{ number_format($medicine->price) }}/= TSh
+                                                </span>
                                             @endif
                                         </h5>
 
