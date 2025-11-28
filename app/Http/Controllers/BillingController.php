@@ -23,14 +23,14 @@ class BillingController extends Controller
         ->paginate(20);
 
     // 2. In Progress (not completed)
-    $inProgressVisits = Visit::with(['patient', 'doctor', 'medicineIssues', 'labOrders', 'injectionOrders', 'bedAdmission'])
-        ->where('all_services_completed', false)
-        ->orWhere(function ($q) {
-            $q->where('all_services_completed', true)
-              ->whereHas('receipt');
-        })
-        ->latest('visit_date')
-        ->get();
+    $inProgressVisits = Visit::with(['patient', 'doctor'])
+    ->where(function ($query) {
+        $query->where('all_services_completed', false)
+              ->orWhereNull('all_services_completed'); // in case it's null
+    })
+    ->whereDoesntHave('receipt') // don't show finalized ones
+    ->latest('visit_date')
+    ->get();
 
     // 3. All receipts with payment status
     $receipts = Receipt::with(['visit.patient', 'visit.payments'])

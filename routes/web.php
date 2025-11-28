@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ProfitReportController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\ProfileController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\LabController;
 use App\Http\Controllers\MedicinePurchaseController;
 use App\Http\Controllers\PharmacyController;
+use App\Http\Controllers\PharmacySaleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -46,6 +48,14 @@ Route::middleware('auth')->group(function () {
     //pharmacy
     Route::get('/pharmacy', [PharmacyController::class, 'index'])->name('pharmacy.index');
     Route::post('/pharmacy/issue/{order}', [PharmacyController::class, 'issue'])->name('pharmacy.issue');
+    Route::get('/pharmacy/history', [PharmacyController::class, 'history'])->name('pharmacy.history');
+
+    Route::prefix('pharmacy')->name('pharmacy.')->group(function () {
+    Route::get('/sales/create', [PharmacySaleController::class, 'create'])->name('sales.create');
+    Route::post('/sales', [PharmacySaleController::class, 'store'])->name('sales.store');
+    Route::get('/sales/{sale}/receipt', [PharmacySaleController::class, 'receipt'])->name('sales.receipt');
+    Route::get('/sales/history', [PharmacySaleController::class, 'history'])->name('sales.history');});
+    Route::get('/admin/profit-report', [ProfitReportController::class, 'index'])->name('admin.profit-report');
 
     //purchase
     Route::middleware(['auth'])->prefix('store')->group(function () {
