@@ -40,7 +40,6 @@
         color: white;
         font-weight: bold;
         font-size: 0.9rem;
-        cursor: pointer;
         transition: all 0.3s ease;
     }
 
@@ -157,7 +156,7 @@
 
                     <div class="card-body p-4 p-xl-5">
 
-                        <!-- PATIENT + VITALS (Compact + Modal) -->
+                        <!-- PATIENT + VITALS (Compact Display Only – No Modal) -->
                         <div class="row g-4 mb-5">
                             <div class="col-xl-7">
                                 <div class="card h-100">
@@ -174,54 +173,26 @@
                                 </div>
                             </div>
 
-                            <!-- VITALS – Compact Icons + Modal -->
+                            <!-- VITALS – Beautiful Display Only (No Editing) -->
                             <div class="col-xl-5">
                                 <div class="card">
                                     <div class="card-body text-center">
                                         <h5 class="text-primary mb-4">Vitals</h5>
                                         <div class="row row-cols-3 g-3">
-                                            <div><div class="vital-badge bg-danger" data-bs-toggle="modal" data-bs-target="#vitalsModal">BP<br><small>{{ $visit->vitals?->bp ?: '—' }}</small></div></div>
-                                            <div><div class="vital-badge bg-warning" data-bs-toggle="modal" data-bs-target="#vitalsModal">Pulse<br><small>{{ $visit->vitals?->pulse ?: '—' }}</small></div></div>
-                                            <div><div class="vital-badge bg-info" data-bs-toggle="modal" data-bs-target="#vitalsModal">Temp<br><small>{{ $visit->vitals?->temperature ?: '—' }}°F</small></div></div>
-                                            <div><div class="vital-badge bg-success" data-bs-toggle="modal" data-bs-target="#vitalsModal">Weight<br><small>{{ $visit->vitals?->weight ?: '—' }} kg</small></div></div>
-                                            <div><div class="vital-badge bg-purple" data-bs-toggle="modal" data-bs-target="#vitalsModal">Height<br><small>{{ $visit->vitals?->height ?: '—' }} cm</small></div></div>
-                                            <div><div class="vital-badge bg-primary" data-bs-toggle="modal" data-bs-target="#vitalsModal">RR<br><small>{{ $visit->vitals?->respiration ?: '—' }}</small></div></div>
+                                            <div><div class="vital-badge bg-danger">BP<br><small>{{ $visit->vitals?->bp ?: '—' }}</small></div></div>
+                                            <div><div class="vital-badge bg-warning">Pulse<br><small>{{ $visit->vitals?->pulse ?: '—' }}</small></div></div>
+                                            <div><div class="vital-badge bg-info">Temp<br><small>{{ $visit->vitals?->temperature ?: '—' }}°F</small></div></div>
+                                            <div><div class="vital-badge bg-success">Weight<br><small>{{ $visit->vitals?->weight ?: '—' }} kg</small></div></div>
+                                            <div><div class="vital-badge bg-purple">Height<br><small>{{ $visit->vitals?->height ?: '—' }} cm</small></div></div>
+                                            <div><div class="vital-badge bg-primary">RR<br><small>{{ $visit->vitals?->respiration ?: '—' }}</small></div></div>
                                         </div>
-                                        <button class="btn btn-outline-primary btn-sm mt-3" data-bs-toggle="modal" data-bs-target="#vitalsModal">
-                                            Edit Vitals
-                                        </button>
+                                        <p class="text-muted small mt-3">Vitals recorded at registration</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- VITALS MODAL -->
-                        <div class="modal fade" id="vitalsModal" tabindex="-1">
-                            <div class="modal-dialog modal-lg">
-                                <div class="modal-content">
-                                    <div class="modal-header bg-primary text-white">
-                                        <h5 class="modal-title">Record Vitals</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <form action="{{ route('doctor.vitals.store', $visit) }}" method="POST">
-                                        @csrf
-                                        <div class="modal-body">
-                                            <div class="row g-4">
-                                                <div class="col-md-4"><label>BP (mmHg)</label><input name="bp" class="form-control" value="{{ $visit->vitals?->bp }}"></div>
-                                                <div class="col-md-4"><label>Pulse (bpm)</label><input name="pulse" type="number" class="form-control" value="{{ $visit->vitals?->pulse }}"></div>
-                                                <div class="col-md-4"><label>Temperature (°F)</label><input name="temperature" type="number" step="0.1" class="form-control" value="{{ $visit->vitals?->temperature }}"></div>
-                                                <div class="col-md-4"><label>Weight (kg)</label><input name="weight" type="number" step="0.1" class="form-control" value="{{ $visit->vitals?->weight }}"></div>
-                                                <div class="col-md-4"><label>Height (cm)</label><input name="height" type="number" step="0.1" class="form-control" value="{{ $visit->vitals?->height }}"></div>
-                                                <div class="col-md-4"><label>Respiration (/min)</label><input name="respiration" class="form-control" value="{{ $visit->vitals?->respiration }}"></div>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="submit" class="btn btn-success btn-lg">Save Vitals</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- VITALS MODAL COMPLETELY REMOVED – NO MORE MISBEHAVIOR! -->
 
 
                              {{-- LAB RESULTS – ONLY SHOW IF ANY COMPLETED --}}
@@ -229,7 +200,6 @@
     <div class="card mb-5 border-0 shadow-lg rounded-4">
         <div class="card-header bg-gradient-success text-white py-4 rounded-top-4">
             <h5 class="mb-0 d-flex align-items-center">
-                <i class="bi bi-file-medical me-3 fs-4"></i>
                 Lab Results • {{ $visit->labOrders->where('is_completed', true)->count() }} Completed
             </h5>
         </div>
@@ -350,7 +320,7 @@
                                                         <select name="lab_tests[]" class="form-select form-select-lg">
                                                             <option value="">Choose Lab Test</option>
                                                             @foreach(\App\Models\LabTestMaster::active()->orderBy('test_name')->get() as $test)
-                                                                <option value="{{ $test->id }}">{{ $test->test_name }} • ₹{{ $test->price }}</option>
+                                                                <option value="{{ $test->id }}">{{ $test->test_name }}</option>
                                                             @endforeach
                                                         </select>
                                                     </div>
@@ -370,47 +340,40 @@
                                             <div id="medicineContainer">
                                                 <template id="medicineTemplate">
     <div class="item-card position-relative mb-4 p-5 rounded-4 border border-primary border-opacity-10">
-        <!-- Remove Button -->
-        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">
-            ×
-        </button>
+        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">×</button>
 
-        <!-- Medicine Name with Select2 -->
         <div class="mb-4">
             <label class="form-label fw-bold text-primary fs-5">Medicine Name</label>
-            <select name="medicines[][medicine_id]" class="form-select form-select-lg select2-medicine" required style="width:100%;">
+            <select name="medicines[][medicine_id]" class="form-select form-select-lg select2-medicine" style="width:100%;">
                 <option value="">Search medicine...</option>
                 @foreach(\App\Models\MedicineMaster::active()->get() as $m)
                     <option value="{{ $m->id }}">
                         {{ $m->medicine_name }} @if($m->generic_name) • {{ $m->generic_name }} @endif
                         @if($m->strength) • {{ $m->strength }} @endif
+                      
                     </option>
                 @endforeach
             </select>
         </div>
 
-        <!-- 1. DOSAGE – Top Row -->
         <div class="mb-4">
             <label class="form-label fw-bold text-info">Dosage</label>
             <input type="text" name="medicines[][dosage]" class="form-control form-control-lg text-center fw-bold fs-4" 
-                   placeholder="e.g. 1-0-1 or 1 tab twice daily" required>
+                   placeholder="e.g. 1-0-1 or 1 tab twice daily">
         </div>
 
-        <!-- 2. DURATION (DAYS) – Second Row -->
         <div class="mb-4">
             <label class="form-label fw-bold text-warning">Duration (Days)</label>
             <input type="number" name="medicines[][duration_days]" min="1" class="form-control form-control-lg text-center fw-bold fs-4" 
-                   placeholder="5" required>
+                   placeholder="5">
         </div>
 
-        <!-- 3. FREQUENCY / TIMING – Last Row -->
         <div class="mb-4">
             <label class="form-label fw-bold text-purple">Frequency / Timing</label>
             <input type="text" name="medicines[][instruction]" class="form-control form-control-lg" 
                    placeholder="e.g. After food, Before sleep, SOS, With water...">
         </div>
 
-        <!-- Optional Extra Instruction -->
         <div class="mt-4">
             <label class="form-label text-success fw-bold">Additional Instruction (Optional)</label>
             <textarea name="medicines[][extra_instruction]" class="form-control" rows="3" 
@@ -427,48 +390,39 @@
                                     </div>
                                 </div>
 
-                                <!-- INJECTION – Fixed with readonly -->
-<div class="col-md-6">
-    <div class="card">
-        <div class="card-body">
-            <h6 class="section-title">Injection (Optional)</h6>
-            <select name="injection_medicine_id" id="injection_medicine_id" class="form-select form-select-lg mb-3">
-                <option value="">No Injection</option>
-                @foreach(\App\Models\MedicineMaster::injectable()->active()->get() as $inj)
-                    <option value="{{ $inj->id }}">{{ $inj->medicine_name }} ({{ $inj->packing }})</option>
-                @endforeach
-            </select>
-            <input type="text" 
-                   name="injection_route" 
-                   id="injection_route" 
-                   class="form-control form-control-lg" 
-                   placeholder="Route: IV / IM / SC / IV Push" 
-                   readonly 
-                   value="{{ old('injection_route') }}">
-        </div>
-    </div>
-</div>
+                                <!-- INJECTION -->
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="section-title">Injection (Optional)</h6>
+                                            <select name="injection_medicine_id" id="injection_medicine_id" class="form-select form-select-lg mb-3">
+                                                <option value="">No Injection</option>
+                                                @foreach(\App\Models\MedicineMaster::injectable()->active()->get() as $inj)
+                                                    <option value="{{ $inj->id }}">{{ $inj->medicine_name }} ({{ $inj->packing }})</option>
+                                                @endforeach
+                                            </select>
+                                            <input type="text" name="injection_route" id="injection_route" class="form-control form-control-lg" 
+                                                   placeholder="Route: IV / IM / SC / IV Push" readonly value="{{ old('injection_route') }}">
+                                        </div>
+                                    </div>
+                                </div>
 
-<!-- ADMISSION – Fixed with readonly -->
-<div class="col-md-6">
-    <div class="card">
-        <div class="card-body">
-            <h6 class="section-title">Bed Admission (Optional)</h6>
-            <select name="ward_id" id="ward_id" class="form-select form-select-lg mb-3">
-                <option value="">No Admission</option>
-                @foreach(\App\Models\Ward::active()->get() as $ward)
-                    <option value="{{ $ward->id }}">{{ $ward->ward_name }} • ₹{{ $ward->price_per_day }}/day • {{ $ward->available_beds }} free</option>
-                @endforeach
-            </select>
-            <textarea name="admission_reason" 
-                      id="admission_reason" 
-                      class="form-control" 
-                      rows="3" 
-                      placeholder="Reason for admission..." 
-                      readonly>{{ old('admission_reason') }}</textarea>
-        </div>
-    </div>
-</div>
+                                <!-- ADMISSION -->
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h6 class="section-title">Bed Admission (Optional)</h6>
+                                            <select name="ward_id" id="ward_id" class="form-select form-select-lg mb-3">
+                                                <option value="">No Admission</option>
+                                                @foreach(\App\Models\Ward::active()->get() as $ward)
+                                                    <option value="{{ $ward->id }}">{{ $ward->ward_name }} • {{ $ward->available_beds }} free</option>
+                                                @endforeach
+                                            </select>
+                                            <textarea name="admission_reason" id="admission_reason" class="form-control" rows="3" 
+                                                      placeholder="Reason for admission..." readonly>{{ old('admission_reason') }}</textarea>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="text-center mt-5">
@@ -531,14 +485,10 @@ document.addEventListener('DOMContentLoaded', function () {
     injMedSelect?.addEventListener('change', toggleInjectionField);
     wardSelect?.addEventListener('change', toggleAdmissionField);
 
-    // ADD MEDICINE ROW + Initialize Select2
     document.getElementById('addMedicineRow')?.addEventListener('click', function () {
         const template = document.getElementById('medicineTemplate').content.cloneNode(true);
         const row = template.querySelector('.item-card');
-        
         document.getElementById('medicineContainer').appendChild(row);
-
-        // Initialize Select2 on the new medicine dropdown
         $(row).find('.select2-medicine').select2({
             placeholder: "Search medicine...",
             allowClear: true,
@@ -546,53 +496,61 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // ADD LAB TEST ROW
     document.getElementById('addLabTest')?.addEventListener('click', function () {
         const template = document.getElementById('labTemplate').content.cloneNode(true);
         document.getElementById('labContainer').appendChild(template);
     });
 
-    // REMOVE MEDICINE ROW — FIXED: Now targets .remove-item
     document.addEventListener('click', function (e) {
         if (e.target.classList.contains('remove-item') || e.target.closest('.remove-item')) {
-            const card = e.target.closest('.item-card');
-            if (card) {
-                card.remove();
-            }
+            e.target.closest('.item-card')?.remove();
         }
-    });
-
-    // REMOVE LAB TEST ROW (old class still used in lab)
-    document.addEventListener('click', function (e) {
         if (e.target.classList.contains('remove-prescription')) {
             e.target.closest('.prescription-item')?.remove();
         }
     });
 
-    // FORM SUBMIT — Clean empty rows
-    form.addEventListener('submit', function () {
-        // Clean empty medicine rows
+    form.addEventListener('submit', function (e) {
+        let hasError = false;
+
         document.querySelectorAll('#medicineContainer .item-card').forEach(card => {
-            const select = card.querySelector('select[name$="[medicine_id]"]');
-            if (!select || !select.value) {
+            const medicineSelect = card.querySelector('select[name$="[medicine_id]"]');
+            const dosageInput = card.querySelector('input[name$="[dosage]"]');
+            const durationInput = card.querySelector('input[name$="[duration_days]"]');
+
+            const hasMedicine = medicineSelect && medicineSelect.value.trim() !== '';
+            const hasDosage = dosageInput && dosageInput.value.trim() !== '';
+            const hasDuration = durationInput && durationInput.value.trim() !== '';
+
+            if (hasMedicine || hasDosage || hasDuration) {
+                if (!hasMedicine || !hasDosage || !hasDuration) {
+                    alert('Please complete all fields for the medicine or remove the row.');
+                    hasError = true;
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.border = '3px solid red';
+                    setTimeout(() => card.style.border = '', 5000);
+                }
+            } else {
                 card.remove();
             }
+            
         });
 
-        // Clean empty lab rows
         document.querySelectorAll('#labContainer .prescription-item').forEach(item => {
-            if (!item.querySelector('select')?.value) {
-                item.remove();
-            }
+            const select = item.querySelector('select');
+            if (!select || !select.value) item.remove();
         });
 
-        // Reset optional fields
         if (!injMedSelect.value) injRouteInput.value = '';
         if (!wardSelect.value) admissionReason.value = '';
+
+        if (hasError) {
+            e.preventDefault();
+            return false;
+        }
     });
 
-    // Auto-add one medicine row on load (optional)
-    document.getElementById('addMedicineRow')?.click();
+    setTimeout(() => document.getElementById('addMedicineRow')?.click(), 100);
 });
 </script>
 @endsection

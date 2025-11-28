@@ -146,18 +146,53 @@ public function index(Request $request)
     }
 
    // Medicines – Only save if medicine selected
+
 if ($hasMedicine) {
+    $alreadyPrescribed = [];
+    $newlyAdded       = [];
+
     foreach ($request->medicines as $med) {
-        if (!empty($med['medicine_id'])) {
+        if (empty($med['medicine_id'])) {
+            continue;
+        }
+
+        $medicineId   = $med['medicine_id'];
+        $medicineName = \App\Models\MedicineMaster::find($medicineId)->medicine_name ?? 'Unknown Medicine';
+
+        // Check if already exists in this visit
+        $exists = VisitMedicineOrder::where('visit_id', $visit->id)
+                                  ->where('medicine_id', $medicineId)
+                                  ->exists();
+
+        if ($exists) {
+            $alreadyPrescribed[] = $medicineName;
+        } else {
+            // Only create if not exists
             VisitMedicineOrder::create([
-                'visit_id'       => $visit->id,
-                'medicine_id'    => $med['medicine_id'],
-                'dosage'         => $med['dosage'] ?? '',
-                'duration_days'  => $med['duration_days'] ?? 1,
-                'instruction'    => $med['instruction'] ?? '',
+                'visit_id'         => $visit->id,
+                'medicine_id'      => $medicineId,
+                'dosage'           => $med['dosage'] ?? '',
+                'duration_days'    => $med['duration_days'] ?? 1,
+                'instruction'      => $med['instruction'] ?? '',
+                'extra_instruction'=> $med['extra_instruction'] ?? '',
             ]);
+            $newlyAdded[] = $medicineName;
         }
     }
+
+    // Prepare success message
+    $message = 'Prescription sent successfully!';
+
+if (!empty($alreadyPrescribed)) {
+    $list = implode(', ', $alreadyPrescribed);
+    $message .= " | Already prescribed (not added again): $list";
+}
+
+if (!empty($newlyAdded) && empty($alreadyPrescribed)) {
+    $message = 'Prescription sent successfully! Medicines added: ' . implode(', ', $newlyAdded);
+}
+
+return back()->with('success', $message);
 }
 
     // Injection & Admission (same as before)

@@ -53,6 +53,7 @@ class RolePermissionSeeder extends Seeder
         Role::firstOrCreate(['name' => 'Reception'])->syncPermissions([
             'view patients', 'create patient', 'edit patient', 'reactivate patient',
             'view visits', 'create visit', 'add vitals', 'collect registration',
+            'generate final bill', 'print receipt',
         ]);
 
         Role::firstOrCreate(['name' => 'Doctor'])->syncPermissions([
