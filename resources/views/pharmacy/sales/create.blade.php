@@ -128,7 +128,7 @@
     </form>
 </div>
 
-{{-- Select2 CSS & JS --}}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
@@ -138,155 +138,155 @@
         padding: 0.375rem 0.75rem;
         font-size: 1.25rem;
         border-radius: 0.5rem;
+        border: 1px solid #86b7b3 solid;
     }
     .select2-container--default .select2-selection--single .select2-selection__rendered {
         line-height: 38px !important;
     }
     .select2-container--default .select2-selection--single .select2-selection__arrow {
         height: 46px !important;
+        right: 10px;
+    }
+    .select2-results__option {
+        padding: 8px 12px;
     }
 </style>
 
 <script>
 let itemIndex = 1;
 
-// Initialize Select2 on page load
-function initializeSelect2() {
-    $('.medicine-select').each(function() {
-        if (!$(this).hasClass("select2-hidden-accessible")) {
-            $(this).select2({
-                placeholder: "Type medicine or generic name...",
-                allowClear: true,
-                width: '100%',
-                templateResult: formatMedicine,
-                templateSelection: formatMedicineSelection,
-                matcher: searchBothNames
-            });
+function initSelect2() {
+    $('.medicine-select').each(function () {
+        if ($(this).hasClass('select2-hidden-accessible')) {
+            $(this).select2('destroy'); // prevent duplicates
         }
+
+        $(this).select2({
+            placeholder: "Type medicine or generic name...",
+            allowClear: true,
+            width: '100%',
+            templateResult: formatMedicine,
+            templateSelection: formatSelection,
+            matcher: searchBothFields
+        });
     });
 }
 
-// Custom display: show medicine + generic
-function formatMedicine(medicine) {
-    // Loading or no result
-    if (!medicine.id) {
-        return medicine.text || "Type to search medicine...";
-    }
+function formatMedicine(option) {
+    if (!option.id) return option.text;
 
-    // Safety check: sometimes medicine.element is not available during search
-    const $option = $(medicine.element);
-    if ($option.length === 0) {
-        return medicine.text; // fallback
-    }
+    var $option = $(option.element);
+    var name = $option.data('name') || option.text;
+    var generic = $option.data('generic') || '';
+    var stock = option.text.match(/\(Stock:[^)]+\)/)?.[0] || '';
 
-    const name = $option.data('name') || medicine.text.split('•')[0].trim();
-    const generic = $option.data('generic') || '';
-    const stockMatch = medicine.text.match(/\(Stock: \d+\)/);
-    const stock = stockMatch ? stockMatch[0] : '';
-
-    let $result = $(`
-        <div>
-            <strong>${name}</strong>
-            ${generic ? `<small class="text-muted"> • ${generic}</small>` : ''}
-            <span class="text-primary float-end">${stock}</span>
+    return $(`
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>${name}</strong>
+                ${generic ? '<small class="text-muted"> • ' + generic + '</small>' : ''}
+            </div>
+            <span class="badge bg-primary rounded-pill">${stock}</span>
         </div>
     `);
-
-    return $result;
 }
 
-function formatMedicineSelection(medicine) {
-    if (!medicine.id) return "Type to search medicine...";
+function formatSelection(option) {
+    if (!option.id) return "Type medicine or generic name...";
 
-    const $option = $(medicine.element);
-    if ($option.length === 0) return medicine.text;
+    var $option = $(option.element);
+    var name = $option.data('name');
+    var generic = $option.data('generic');
 
-    const name = $option.data('name') || medicine.text.split('•')[0].trim();
-    const generic = $option.data('generic');
-
-    if (generic) {
-        return `${name} • ${generic}`;
-    }
+    if (generic) return name + ' • ' + generic;
     return name;
 }
 
-// Search both medicine_name and generic_name
-function searchBothNames(params, data) {
+function searchBothFields(params, data) {
     if ($.trim(params.term) === '') return data;
 
-    let term = params.term.toLowerCase();
-    let medicineName = ($(data.element).data('name') || '').toString().toLowerCase();
-    let genericName = ($(data.element).data('generic') || '').toString().toLowerCase();
+    var term = params.term.toLowerCase();
+    var $el = $(data.element);
 
-    if (medicineName.indexOf(term) > -1 || genericName.indexOf(term) > -1) {
+    var name = ($el.data('name') || '').toString().toLowerCase();
+    var generic = ($el.data('generic') || '').toString().toLowerCase();
+
+    if (name.includes(term) || generic.includes(term)) {
         return data;
     }
     return null;
 }
 
-// Add new item row
-document.getElementById('addItem').addEventListener('click', function() {
+// Add new row
+document.getElementById('addItem').addEventListener('click', function () {
     const container = document.getElementById('itemsContainer');
-    const row = document.querySelector('.item-row').cloneNode(true);
+    const template = document.querySelector('.item-row');
+    const clone = template.cloneNode(true);
 
-    // Reset values
-    row.querySelectorAll('input, select').forEach(el => {
-        if (el.classList.contains('medicine-select')) {
-            el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
-            $(el).val(null).trigger('change'); // Important for Select2
-        } else if (el.name.includes('[quantity]')) {
-            el.name = "1";
-            el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
-        } else if (el.classList.contains('price-display')) {
-            el.value = '';
+    let newIndex = itemIndex++;
+
+    // Update names
+    clone.querySelectorAll('[name]').forEach(el => {
+        if (el.name.includes('medicine_id')) {
+            el.name = el.name.replace(/\[\d+\]/, `[${newIndex}]`);
+        }
+        if (el.name.includes('quantity')) {
+            el.name = el.name.replace(/\[\d+\]/, `[${newIndex}]`);
+            el.value = 1;
         }
     });
 
-    row.querySelector('.line-total').textContent = '0';
-    container.appendChild(row);
-    itemIndex++;
+    // Reset fields
+    clone.querySelector('.medicine-select').selectedIndex = 0;
+    clone.querySelector('.qty-input').value = 1;
+    clone.querySelector('.price-display').value = '';
+    clone.querySelector('.line-total').textContent = '0';
 
-    // Re-initialize Select2 on new select
-    initializeSelect2();
+    container.appendChild(clone);
+    initSelect2(); // re-initialize Select2 on new row
     updateTotals();
 });
 
-// Update totals on change/input
-document.addEventListener('change', updateTotals);
-document.addEventListener('input', updateTotals);
-
+// Update prices and totals
 function updateTotals() {
     let grandTotal = 0;
 
     document.querySelectorAll('.item-row').forEach(row => {
         const select = row.querySelector('.medicine-select');
-        const selectedOption = select.options[select.selectedIndex];
+        const option = select.options[select.selectedIndex];
+
         const qty = parseInt(row.querySelector('.qty-input').value) || 0;
-        const price = parseFloat(selectedOption?.dataset.price) || 0;
+        const price = option ? parseFloat(option.dataset.price) || 0 : 0;
         const lineTotal = qty * price;
 
         row.querySelector('.price-display').value = price > 0 ? price.toLocaleString() : '';
         row.querySelector('.line-total').textContent = lineTotal.toLocaleString();
+
         grandTotal += lineTotal;
     });
 
     document.getElementById('grandTotal').textContent = grandTotal.toLocaleString();
-    document.getElementById('amountPaid').value = grandTotal.toFixed(2);
-    document.getElementById('changeDue').textContent = '0';
+    document.getElementById('amountPaid').value = grandTotal;
 }
 
-// Remove item
-document.addEventListener('click', function(e) {
+// Remove row
+document.addEventListener('click', e => {
     if (e.target.closest('.remove-item') && document.querySelectorAll('.item-row').length > 1) {
         e.target.closest('.item-row').remove();
         updateTotals();
     }
 });
 
-// Initialize on load
-document.addEventListener('DOMContentLoaded', function() {
-    initializeSelect2();
+// Initialize everything when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    initSelect2();
     updateTotals();
+
+    // Re-calculate when quantity or medicine changes
+    document.addEventListener('change', updateTotals);
+    document.addEventListener('input', e => {
+        if (e.target.matches('.qty-input')) updateTotals();
+    });
 });
 </script>
 @endsection
