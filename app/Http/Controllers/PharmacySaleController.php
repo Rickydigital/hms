@@ -105,6 +105,44 @@ class PharmacySaleController extends Controller
         return view('pharmacy.sales.receipt', compact('sale'));
     }
 
+    public function search(Request $request)
+{
+    if (!$request->filled('q')) {
+        return response()->json([]);
+    }
+
+    $term = trim($request->q);
+
+    $results = MedicineMaster::active()
+        ->whereAny([
+            'medicine_name',
+            'generic_name',
+            'strength',
+            'dosage_form',
+            'manufacturer'
+        ], 'LIKE', "%{$term}%")
+        ->withSum('batches as total_stock', 'current_stock')
+        ->select('id', 'medicine_name', 'generic_name', 'strength', 'price')
+        ->having('total_stock', '>', 0) // Only show medicines with stock
+        ->orderBy('medicine_name')
+        ->limit(30)
+        ->get()
+        ->map(function ($med) {
+            $stock = (int) $med->total_stock;
+            return [
+                'id' => $med->id,
+                'text' => $med->medicine_name
+                    . ($med->generic_name ? " • {$med->generic_name}" : "")
+                    . ($med->strength ? " {$med->strength}" : "")
+                    . " — Stock: {$stock}",
+                'price' => $med->price,
+                'stock' => $stock,
+            ];
+        });
+
+    return response()->json($results);
+}
+
     public function history(Request $request)
     {
         $sales = PharmacySale::with(['soldBy', 'items.medicine'])
