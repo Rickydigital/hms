@@ -7,12 +7,12 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 text-teal-800 fw-bold">
-                <i class="bi bi-cart-plus me-3"></i> Direct Direct Medicine Sale (OTC)
+                Direct Medicine Sale (OTC)
             </h1>
             <p class="text-muted">Sell medicines to walk-in customers</p>
         </div>
         <a href="{{ route('pharmacy.index') }}" class="btn btn-outline-teal">
-            <i class="bi bi-arrow-left"></i> Back to Dashboard
+            Back to Dashboard
         </a>
     </div>
 
@@ -48,44 +48,7 @@
             </div>
             <div class="card-body">
                 <div id="itemsContainer">
-                    <!-- Template Row -->
-                    <div class="item-row mb-4 p-4 border rounded bg-light">
-                        <div class="row g-3 align-items-end">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Medicine</label>
-                                <select name="items[0][medicine_id]" class="form-select form-select-lg medicine-select" required>
-                                    <option value="">Type to search medicine...</option>
-                                    @foreach(\App\Models\MedicineMaster::active()->orderBy('medicine_name')->get() as $med)
-                                        <option value="{{ $med->id }}"
-                                                data-price="{{ $med->price }}"
-                                                data-stock="{{ $med->currentStock() }}">
-                                            {{ $med->medicine_name }}
-                                            @if($med->generic_name) • {{ $med->generic_name }} @endif
-                                            (Stock: {{ $med->currentStock() }} | Tsh {{ number_format((float)$med->price) }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Quantity</label>
-                                <input type="number" name="items[0][quantity]" class="form-control qty-input" min="1" value="1" required>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label fw-bold">Unit Price</label>
-                                <input type="text" class="form-control price-display" readonly>
-                            </div>
-                            <div class="col-md-1 text-end">
-                                <button type="button" class="btn btn-danger btn-sm remove-item">
-                                    Remove
-                                </button>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-md-12 text-end">
-                                <strong>Line Total: Tsh <span class="line-total">0</span></strong>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Rows will be added here dynamically -->
                 </div>
 
                 <div class="text-end mt-4">
@@ -107,7 +70,7 @@
                         <label class="form-label fw-bold">Amount Paid</label>
                         <input type="number" name="amount_paid" id="amountPaid" 
                                class="form-control form-control-lg text-end fw-bold text-teal-700" 
-                               value="0" step="0.01" required>
+                               value="0" step="1" min="0" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Change Due</label>
@@ -126,12 +89,51 @@
     </form>
 </div>
 
-{{-- Select2 CSS (use local or CDN - both work) --}}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{{-- Hidden Template (Invisible - Only for cloning) --}}
+<template id="itemTemplate">
+    <div class="item-row mb-4 p-4 border rounded bg-light position-relative">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Medicine</label>
+                <select name="items[0][medicine_id]" class="form-select form-select-lg medicine-select" required>
+                    <option value="">Type to search medicine...</option>
+                    @foreach(\App\Models\MedicineMaster::active()->orderBy('medicine_name')->get() as $med)
+                        <option value="{{ $med->id }}"
+                                data-price="{{ $med->price }}"
+                                data-stock="{{ $med->currentStock() }}">
+                            {{ $med->medicine_name }}
+                            @if($med->generic_name) • {{ $med->generic_name }} @endif
+                            (Stock: {{ $med->currentStock() }} | Tsh {{ number_format((float)$med->price) }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Quantity</label>
+                <input type="number" name="items[0][quantity]" class="form-control qty-input" min="1" value="1" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold">Unit Price</label>
+                <input type="text" class="form-control price-display" readonly>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-danger btn-sm remove-item">
+                    Remove
+                </button>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-12 text-end">
+                <strong>Line Total: Tsh <span class="line-total">0</span></strong>
+            </div>
+        </div>
+    </div>
+</template>
 
-{{-- Load jQuery FIRST, then Select2 --}}
+{{-- Load jQuery + Select2 --}}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
 <style>
     .select2-container--default .select2-selection--single {
@@ -150,53 +152,50 @@
 </style>
 
 <script>
-let itemIndex = 1;
+let itemIndex = 0;
 
-// Add new row
-document.getElementById('addItem').addEventListener('click', function () {
-    const container = document.getElementById('itemsContainer');
-    const template = container.querySelector('.item-row');
-    const newRow = template.cloneNode(true);
+function addNewRow() {
+    const template = document.getElementById('itemTemplate').content.cloneNode(true);
+    const row = template.querySelector('.item-row');
 
-    // Update names with new index
-    newRow.querySelectorAll('select[name*="medicine_id"], input[name*="quantity"]').forEach(el => {
-        const name = el.getAttribute('name');
-        el.setAttribute('name', name.replace(/\[\d+\]/, '[' + itemIndex + ']'));
+    // Update index in name attributes
+    row.querySelectorAll('[name*="items"]').forEach(el => {
+        el.name = el.name.replace('[0]', '[' + itemIndex + ']');
     });
 
     // Reset values
-    newRow.querySelector('.medicine-select').value = '';
-    newRow.querySelector('.qty-input').value = 1;
-    newRow.querySelector('.price-display').value = '';
-    newRow.querySelector('.line-total').textContent = '0';
+    row.querySelector('.qty-input').value = 1;
+    row.querySelector('.price-display').value = '';
+    row.querySelector('.line-total').textContent = '0';
 
-    container.appendChild(newRow);
+    document.getElementById('itemsContainer').appendChild(row);
     itemIndex++;
 
-    // Initialize Select2 on new row
-    $(newRow).find('.medicine-select').select2({
+    // Initialize Select2
+    $(row).find('.medicine-select').select2({
         placeholder: "Type to search medicine...",
         allowClear: true,
         width: '100%'
     });
 
-    attachRowEvents(newRow);
+    // Attach events
+    attachRowEvents(row);
     updateTotals();
-});
+}
 
-// Attach events to a row (quantity change, select change, remove)
 function attachRowEvents(row) {
-    row.querySelector('.medicine-select').addEventListener('change', updateTotals);
-    row.querySelector('.qty-input').addEventListener('input', updateTotals);
+    const select = row.querySelector('.medicine-select');
+    const qty = row.querySelector('.qty-input');
+
+    select.addEventListener('change', updateTotals);
+    qty.addEventListener('input', updateTotals);
+
     row.querySelector('.remove-item').addEventListener('click', function () {
-        if (document.querySelectorAll('.item-row').length > 1) {
-            row.remove();
-            updateTotals();
-        }
+        row.remove();
+        updateTotals();
     });
 }
 
-// Update all calculations
 function updateTotals() {
     let grandTotal = 0;
 
@@ -207,7 +206,7 @@ function updateTotals() {
         const price = option ? parseFloat(option.dataset.price || 0) : 0;
         const lineTotal = qty * price;
 
-        row.querySelector('.price-display').value = price.toLocaleString('en-TZ', { minimumFractionDigits: 0 });
+        row.querySelector('.price-display').value = price.toLocaleString('en-TZ');
         row.querySelector('.line-total').textContent = lineTotal.toLocaleString('en-TZ');
         grandTotal += lineTotal;
     });
@@ -218,7 +217,6 @@ function updateTotals() {
     calculateChange();
 }
 
-// Calculate change
 function calculateChange() {
     const total = parseFloat(document.getElementById('grandTotal').textContent.replace(/,/g, '')) || 0;
     const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
@@ -226,23 +224,12 @@ function calculateChange() {
     document.getElementById('changeDue').textContent = change >= 0 ? change.toLocaleString('en-TZ') : '0';
 }
 
-// Initialize everything when page loads
+// Add first row on load
 $(document).ready(function () {
-    // Initialize Select2 on all medicine selects (including first row)
-    $('.medicine-select').select2({
-        placeholder: "Type to search medicine...",
-        allowClear: true,
-        width: '100%'
-    });
+    addNewRow(); // Automatically add one row when page loads
 
-    // Attach events to all rows
-    document.querySelectorAll('.item-row').forEach(attachRowEvents);
-
-    // Listen to amount paid changes
+    document.getElementById('addItem').addEventListener('click', addNewRow);
     document.getElementById('amountPaid').addEventListener('input', calculateChange);
-
-    // Initial calculation
-    updateTotals();
 });
 </script>
 @endsection
