@@ -8,12 +8,12 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 text-teal-800 fw-bold">
-                <i class="bi bi-cart-plus me-3"></i> Direct Medicine Sale (OTC)
+                Direct Medicine Sale (OTC)
             </h1>
             <p class="text-muted">Sell medicines to walk-in customers</p>
         </div>
         <a href="{{ route('pharmacy.index') }}" class="btn btn-outline-teal">
-            <i class="bi bi-arrow-left"></i> Back to Dashboard
+            Back to Dashboard
         </a>
     </div>
 
@@ -23,7 +23,7 @@
         <!-- Customer Info -->
         <div class="card shadow mb-4 border-teal">
             <div class="card-header bg-teal text-white py-3">
-                <h5 class="mb-0"><i class="bi bi-person me-2"></i> Customer Information (Optional)</h5>
+                <h5 class="mb-0">Customer Information (Optional)</h5>
             </div>
             <div class="card-body">
                 <div class="row g-3">
@@ -42,9 +42,9 @@
         <!-- Medicine Items -->
         <div class="card shadow mb-4 border-teal">
             <div class="card-header bg-teal text-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-prescription2 me-2"></i> Medicines to Sell</h5>
+                <h5 class="mb-0">Medicines to Sell</h5>
                 <button type="button" class="btn btn-light btn-sm" id="addItem">
-                    <i class="bi bi-plus-circle"></i> Add Item
+                    Add Item
                 </button>
             </div>
             <div class="card-body">
@@ -59,7 +59,7 @@
                                         <option value="{{ $med->id }}"
                                             data-price="{{ $med->price }}"
                                             data-name="{{ $med->medicine_name }}"
-                                            data-generic="{{ $med->generic_name }}">
+                                            data-generic="{{ $med->generic_name ?? '' }}">
                                             {{ $med->medicine_name }}
                                             @if($med->generic_name) • {{ $med->generic_name }} @endif
                                             (Stock: {{ $med->currentStock() }})
@@ -77,7 +77,7 @@
                             </div>
                             <div class="col-md-1 text-end">
                                 <button type="button" class="btn btn-danger btn-sm remove-item">
-                                    <i class="bi bi-trash"></i>
+                                    Remove
                                 </button>
                             </div>
                         </div>
@@ -100,25 +100,21 @@
         <!-- Payment -->
         <div class="card shadow mb-4 border-teal">
             <div class="card-header bg-teal text-white py-3">
-                <h5 class="mb-0"><i class="bi bi-cash-coin me-2"></i> Payment</h5>
+                <h5 class="mb-0">Payment</h5>
             </div>
             <div class="card-body">
                 <div class="row g-4">
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Amount Paid</label>
                         <input type="number" name="amount_paid" id="amountPaid" 
-                               class="form-control form-control-lg text-end fw-bold text-teal-700" 
-                               readonly required>
+                               class="form-control form-control-lg text-end fw-bold text-teal-700" readonly required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Change Due</label>
-                        <div class="form-control form-control-lg text-end fw-bold text-success fs-4" id="changeDue">
-                            0
-                        </div>
+                        <div class="form-control form-control-lg text-end fw-bold text-success fs-4" id="changeDue">0</div>
                     </div>
                     <div class="col-md-4 d-flex align-items-end">
                         <button type="submit" class="btn btn-teal btn-lg w-100 shadow-lg">
-                            <i class="bi bi-check-circle-fill me-2"></i>
                             Complete Sale & Print Receipt
                         </button>
                     </div>
@@ -128,6 +124,7 @@
     </form>
 </div>
 
+{{-- LOAD jQuery & Select2 FIRST --}}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -135,138 +132,103 @@
 <style>
     .select2-container .select2-selection--single {
         height: 48px !important;
-        padding: 0.375rem 0.75rem;
-        font-size: 1.25rem;
         border-radius: 0.5rem;
-        border: 1px solid #86b7b3 solid;
+        border: 1px solid #ced4da;
     }
     .select2-container--default .select2-selection--single .select2-selection__rendered {
         line-height: 38px !important;
+        font-size: 1.25rem;
+        padding-left: 12px;
     }
     .select2-container--default .select2-selection--single .select2-selection__arrow {
         height: 46px !important;
-        right: 10px;
     }
     .select2-results__option {
-        padding: 8px 12px;
+        padding: 10px 12px;
     }
 </style>
 
 <script>
 let itemIndex = 1;
 
+// Initialize Select2
 function initSelect2() {
-    $('.medicine-select').each(function () {
-        if ($(this).hasClass('select2-hidden-accessible')) {
-            $(this).select2('destroy'); // prevent duplicates
-        }
-
-        $(this).select2({
-            placeholder: "Type medicine or generic name...",
-            allowClear: true,
-            width: '100%',
-            templateResult: formatMedicine,
-            templateSelection: formatSelection,
-            matcher: searchBothFields
-        });
+    $('.medicine-select').not('.select2-hidden-accessible').select2({
+        placeholder: "Type medicine or generic name...",
+        allowClear: true,
+        width: '100%',
+        templateResult: formatMedicine,
+        templateSelection: formatSelection
     });
 }
 
-function formatMedicine(option) {
-    if (!option.id) return option.text;
+// Beautiful dropdown item
+function formatMedicine(item) {
+    if (!item.id) return item.text;
 
-    var $option = $(option.element);
-    var name = $option.data('name') || option.text;
-    var generic = $option.data('generic') || '';
-    var stock = option.text.match(/\(Stock:[^)]+\)/)?.[0] || '';
+    const name = item.element.dataset.name || item.text;
+    const generic = item.element.dataset.generic || '';
+    const stock = item.text.match(/\(Stock:[^)]+\)/)?.[0] || '';
 
     return $(`
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <strong>${name}</strong>
-                ${generic ? '<small class="text-muted"> • ' + generic + '</small>' : ''}
+                ${generic ? `<small class="text-muted"> • ${generic}</small>` : ''}
             </div>
-            <span class="badge bg-primary rounded-pill">${stock}</span>
+            <span class="badge bg-primary">${stock}</span>
         </div>
     `);
 }
 
-function formatSelection(option) {
-    if (!option.id) return "Type medicine or generic name...";
-
-    var $option = $(option.element);
-    var name = $option.data('name');
-    var generic = $option.data('generic');
-
-    if (generic) return name + ' • ' + generic;
-    return name;
-}
-
-function searchBothFields(params, data) {
-    if ($.trim(params.term) === '') return data;
-
-    var term = params.term.toLowerCase();
-    var $el = $(data.element);
-
-    var name = ($el.data('name') || '').toString().toLowerCase();
-    var generic = ($el.data('generic') || '').toString().toLowerCase();
-
-    if (name.includes(term) || generic.includes(term)) {
-        return data;
-    }
-    return null;
+// What shows after selection
+function formatSelection(item) {
+    if (!item.id) return "Type to search medicine...";
+    const name = item.element.dataset.name;
+    const generic = item.element.dataset.generic;
+    return generic ? `${name} • ${generic}` : name;
 }
 
 // Add new row
-document.getElementById('addItem').addEventListener('click', function () {
+document.getElementById('addItem').addEventListener('click', () => {
     const container = document.getElementById('itemsContainer');
-    const template = document.querySelector('.item-row');
-    const clone = template.cloneNode(true);
+    const row = document.querySelector('.item-row').cloneNode(true);
 
-    let newIndex = itemIndex++;
-
-    // Update names
-    clone.querySelectorAll('[name]').forEach(el => {
-        if (el.name.includes('medicine_id')) {
-            el.name = el.name.replace(/\[\d+\]/, `[${newIndex}]`);
-        }
-        if (el.name.includes('quantity')) {
-            el.name = el.name.replace(/\[\d+\]/, `[${newIndex}]`);
-            el.value = 1;
-        }
+    // Update index
+    row.querySelectorAll('select, input').forEach(el => {
+        ['medicine_id', 'quantity'].forEach(attr => {
+            if (el.name.includes(attr)) {
+                el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
+            }
+        });
+        if (el.classList.contains('qty-input')) el.value = 1;
+        if (el.classList.contains('price-display')) el.value = '';
     });
 
-    // Reset fields
-    clone.querySelector('.medicine-select').selectedIndex = 0;
-    clone.querySelector('.qty-input').value = 1;
-    clone.querySelector('.price-display').value = '';
-    clone.querySelector('.line-total').textContent = '0';
+    row.querySelector('.line-total').textContent = '0';
+    container.appendChild(row);
+    itemIndex++;
 
-    container.appendChild(clone);
-    initSelect2(); // re-initialize Select2 on new row
+    initSelect2(); // Re-init Select2 for new row
     updateTotals();
 });
 
-// Update prices and totals
+// Calculate totals
 function updateTotals() {
-    let grandTotal = 0;
-
+    let total = 0;
     document.querySelectorAll('.item-row').forEach(row => {
         const select = row.querySelector('.medicine-select');
-        const option = select.options[select.selectedIndex];
-
         const qty = parseInt(row.querySelector('.qty-input').value) || 0;
-        const price = option ? parseFloat(option.dataset.price) || 0 : 0;
+        const price = select.selectedIndex > 0 ? parseFloat(select.options[select.selectedIndex].dataset.price) || 0 : 0;
         const lineTotal = qty * price;
 
         row.querySelector('.price-display').value = price > 0 ? price.toLocaleString() : '';
         row.querySelector('.line-total').textContent = lineTotal.toLocaleString();
-
-        grandTotal += lineTotal;
+        total += lineTotal;
     });
 
-    document.getElementById('grandTotal').textContent = grandTotal.toLocaleString();
-    document.getElementById('amountPaid').value = grandTotal;
+    document.getElementById('grandTotal').textContent = total.toLocaleString();
+    document.getElementById('amountPaid').value = total;
 }
 
 // Remove row
@@ -277,15 +239,14 @@ document.addEventListener('click', e => {
     }
 });
 
-// Initialize everything when page loads
+// Start everything
 document.addEventListener('DOMContentLoaded', () => {
     initSelect2();
     updateTotals();
 
-    // Re-calculate when quantity or medicine changes
-    document.addEventListener('change', updateTotals);
-    document.addEventListener('input', e => {
-        if (e.target.matches('.qty-input')) updateTotals();
+    // Listen for changes
+    document.addEventListener('change', e => {
+        if (e.target.matches('.medicine-select, .qty-input')) updateTotals();
     });
 });
 </script>
