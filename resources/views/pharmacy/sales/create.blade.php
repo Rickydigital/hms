@@ -49,19 +49,14 @@
             </div>
             <div class="card-body">
                 <div id="itemsContainer">
-
-                    <!-- Single Item Row -->
                     <div class="item-row mb-4 p-4 border rounded bg-light">
-                        <!-- Medicine Selection -->
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-11">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-6">
                                 <label class="form-label fw-bold">Medicine</label>
                                 <select name="items[0][medicine_id]" class="form-select form-select-lg medicine-select" required>
                                     <option value="">Select medicine...</option>
                                     @foreach(\App\Models\MedicineMaster::active()->orderBy('medicine_name')->get() as $med)
-                                        <option value="{{ $med->id }}"
-                                                data-price="{{ $med->price }}"
-                                                data-stock="{{ $med->currentStock() }}">
+                                        <option value="{{ $med->id }}" data-price="{{ $med->price }}">
                                             {{ $med->medicine_name }}
                                             @if($med->generic_name) • {{ $med->generic_name }} @endif
                                             (Stock: {{ $med->currentStock() }})
@@ -69,36 +64,32 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Quantity</label>
+                                <input type="number" name="items[0][quantity]" class="form-control form-control-lg qty-input" min="1" value="1" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold">Price</label>
+                                <input type="text" class="form-control form-control-lg price-display" readonly>
+                            </div>
                             <div class="col-md-1 text-end">
-                                <button type="button" class="btn btn-danger btn-sm remove-item mt-4">
+                                <button type="button" class="btn btn-danger btn-sm remove-item">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
                         </div>
-
-                        <!-- Quantity & Price (Below Medicine) -->
-                        <div class="row g-3 align-items-end">
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Quantity</label>
-                                <input type="number" name="items[0][quantity]" class="form-control form-control-lg qty-input" min="1" value="1" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Unit Price (Tsh)</label>
-                                <input type="text" class="form-control form-control-lg price-display" readonly placeholder="0">
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <strong class="fs-5">Line Total: Tsh <span class="line-total text-teal-700">0</span></strong>
+                        <div class="row mt-3">
+                            <div class="col-md-12 text-end">
+                                <strong>Line Total: Tsh <span class="line-total">0</span></strong>
                             </div>
                         </div>
                     </div>
-                    <!-- End of Item Row -->
-
                 </div>
 
                 <div class="text-end mt-4">
-                    <h3 class="text-teal-800 fw-bold">
+                    <h4 class="text-teal-700">
                         Grand Total: Tsh <span id="grandTotal">0</span>
-                    </h3>
+                    </h4>
                 </div>
             </div>
         </div>
@@ -109,12 +100,12 @@
                 <h5 class="mb-0"><i class="bi bi-cash-coin me-2"></i> Payment</h5>
             </div>
             <div class="card-body">
-                <div class="row g-4 align-items-end">
+                <div class="row g-4">
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Amount Paid</label>
                         <input type="number" name="amount_paid" id="amountPaid" 
                                class="form-control form-control-lg text-end fw-bold text-teal-700" 
-                               value="0" readonly required>
+                               readonly required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Change Due</label>
@@ -122,7 +113,7 @@
                             0
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-4 d-flex align-items-end">
                         <button type="submit" class="btn btn-teal btn-lg w-100 shadow-lg">
                             <i class="bi bi-check-circle-fill me-2"></i>
                             Complete Sale & Print Receipt
@@ -137,71 +128,50 @@
 <script>
 let itemIndex = 1;
 
-// Add New Item Row
 document.getElementById('addItem').addEventListener('click', function() {
     const container = document.getElementById('itemsContainer');
-    const template = document.querySelector('.item-row');
-    const clone = template.cloneNode(true);
-
-    // Reset values
-    clone.querySelector('.medicine-select').value = '';
-    clone.querySelector('.medicine-select').name = clone.querySelector('.medicine-select').name.replace(/\[\d+\]/, `[${itemIndex}]`);
-    clone.querySelector('.qty-input').value = '1';
-    clone.querySelector('.qty-input').name = clone.querySelector('.qty-input').name.replace(/\[\d+\]/, `[${itemIndex}]`);
-    clone.querySelector('.price-display').value = '';
-    clone.querySelector('.line-total').textContent = '0';
-
-    container.appendChild(clone);
+    const row = document.querySelector('.item-row').cloneNode(true);
+    
+    row.querySelectorAll('input, select').forEach(el => {
+        el.value = '';
+        if (el.name.includes('[medicine_id]')) el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
+        if (el.name.includes('[quantity]')) el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
+    });
+    
+    row.querySelector('.line-total').textContent = '0';
+    row.querySelector('.price-display').value = '';
+    container.appendChild(row);
     itemIndex++;
+    updateTotals();
 });
 
-// Update all calculations
+document.addEventListener('change', updateTotals);
+document.addEventListener('input', updateTotals);
+
 function updateTotals() {
     let grandTotal = 0;
 
     document.querySelectorAll('.item-row').forEach(row => {
         const select = row.querySelector('.medicine-select');
-        const qtyInput = row.querySelector('.qty-input');
-        const priceDisplay = row.querySelector('.price-display');
-        const lineTotalSpan = row.querySelector('.line-total');
+        const qty = parseInt(row.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(select.selectedOptions[0]?.dataset.price) || 0;
+        const lineTotal = qty * price;
 
-        const selectedOption = select.selectedOptions[0];
-        const price = selectedOption ? parseFloat(selectedOption.dataset.price) || 0 : 0;
-        const qty = parseInt(qtyInput.value) || 0;
-        const lineTotal = price * qty;
-
-        // Auto-fill unit price when medicine is selected
-        if (selectedOption && priceDisplay.value === '') {
-            priceDisplay.value = price.toLocaleString();
-        }
-
-        // Auto-set quantity to 1 if medicine selected and qty is empty
-        if (selectedOption && qtyInput.value === '') {
-            qtyInput.value = 1;
-        }
-
-        lineTotalSpan.textContent = lineTotal.toLocaleString();
+        row.querySelector('.price-display').value = price.toLocaleString();
+        row.querySelector('.line-total').textContent = lineTotal.toLocaleString();
         grandTotal += lineTotal;
     });
 
     document.getElementById('grandTotal').textContent = grandTotal.toLocaleString();
-    document.getElementById('amountPaid').value = grandTotal;
-    document.getElementById('changeDue').textContent = '0';
+    document.getElementById('amountPaid').value = grandTotal.toFixed(2); // Auto-set Amount Paid
+    document.getElementById('changeDue').textContent = '0'; // Always 0 since paid = total
 }
 
-// Triggers
-document.addEventListener('change', updateTotals);
-document.addEventListener('input', updateTotals);
-
-// Remove item
 document.addEventListener('click', function(e) {
     if (e.target.closest('.remove-item') && document.querySelectorAll('.item-row').length > 1) {
         e.target.closest('.item-row').remove();
         updateTotals();
     }
 });
-
-// Initial calculation
-updateTotals();
 </script>
 @endsection
