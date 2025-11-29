@@ -83,7 +83,7 @@ class RolePermissionSeeder extends Seeder
             [
                 'employee_code' => 'EMP001',
                 'name'          => 'Administrator',
-                'phone'         => '9876543210',
+                'phone'         => '0624592725',
                 'department'    => 'Admin',
                 'password'      => bcrypt('admin123'), // Change after first login!
                 'is_active'     => true,

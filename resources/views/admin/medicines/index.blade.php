@@ -105,6 +105,18 @@
         </div>
     </div>
 
+    <div class="card-footer bg-transparent border-top-0 py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="text-muted small">
+            Showing {{ $medicines->firstItem() ?? 0 }} to {{ $medicines->lastItem() ?? 0 }}
+            of {{ $medicines->total() }} entries
+        </div>
+
+        {{ $medicines->links() }}
+    </div>
+</div>
+</div>
+
     <!-- Add Modal -->
     <div class="modal fade" id="addMedicineModal">
         <div class="modal-dialog modal-xl">
