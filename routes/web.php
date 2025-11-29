@@ -30,7 +30,8 @@ Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'inde
 
 Route::middleware('auth')->group(function () {
 
-    Route::get('/pharmacy/medicines/search', [PharmacySaleController::class, 'search'])->name('medicines.search');
+    Route::get('/pharmacy/medicines/search', [PharmacySaleController::class, 'search'])
+    ->name('pharmacy.medicines.search');
     // Patients
     Route::resource('patients', PatientController::class)->only(['index', 'store']);
     Route::post('/patients/{patient}/visit', [VisitController::class, 'store'])->name('patients.visit.store');
