@@ -398,7 +398,7 @@
                                             <select name="injection_medicine_id" id="injection_medicine_id" class="form-select form-select-lg mb-3">
                                                 <option value="">No Injection</option>
                                                 @foreach(\App\Models\MedicineMaster::injectable()->active()->get() as $inj)
-                                                    <option value="{{ $inj->id }}">{{ $inj->medicine_name }} ({{ $inj->packing }})</option>
+                                                    <option value="{{ $inj->id }}">{{ $inj->generic_name }}</option>
                                                 @endforeach
                                             </select>
                                             <input type="text" name="injection_route" id="injection_route" class="form-control form-control-lg" 

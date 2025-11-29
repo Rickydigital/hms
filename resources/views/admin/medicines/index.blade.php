@@ -104,18 +104,12 @@
             </div>
         </div>
     </div>
-
-    <div class="card-footer bg-transparent border-top-0 py-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div class="text-muted small">
-            Showing {{ $medicines->firstItem() ?? 0 }} to {{ $medicines->lastItem() ?? 0 }}
-            of {{ $medicines->total() }} entries
+    <div class="card-footer bg-transparent border-0">
+            <nav aria-label="Medicines pagination">
+                {{ $medicines->links('pagination::bootstrap-5') }}
+            </nav>
         </div>
-
-        {{ $medicines->links() }}
     </div>
-</div>
-</div>
 
     <!-- Add Modal -->
     <div class="modal fade" id="addMedicineModal">
