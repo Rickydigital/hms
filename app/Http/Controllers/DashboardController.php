@@ -24,10 +24,10 @@ class DashboardController extends Controller
 
         // Role-specific extra data (optional – you can expand later)
         if ($user->hasRole('Doctor')) {
-            $data['myTodayPatients'] = Visit::whereHas('prescription', function($q) use ($user) {
-                $q->where('doctor_id', $user->id);
-            })->whereDate('visit_date', $today)->count();
-        }
+        $data['myTodayPatients'] = Visit::where('doctor_id', $user->id)
+            ->whereDate('visit_date', $today)
+            ->count();
+    }
 
         if ($user->hasRole('Reception')) {
             $data['pendingRegistrations'] = Visit::whereDate('visit_date', $today)
