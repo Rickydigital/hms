@@ -113,7 +113,7 @@
         @endforelse
     </div>
 
-    <div class="mt-4">{{ $patients->links() }}</div>
+    <div class="mt-4">{{ $patients->links('pagination::bootstrap-5') }}</div>
 </div>
 
 <!-- Mobile FAB -->

@@ -99,7 +99,7 @@
             </div>
             <div class="card-footer bg-light">
                 @if(is_object($issues) && method_exists($issues, 'links'))
-                    {{ $issues->links() }}
+                    {{ $issues->links('pagination::bootstrap-5') }}
                 @endif
             </div>
         </div>
