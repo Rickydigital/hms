@@ -57,7 +57,7 @@
                 </table>
             </div>
             <div class="card-footer bg-light">
-                {{ $sales->links() }}
+                {{ $sales->links('pagination::bootstrap-5')  }}
             </div>
         </div>
     </div>
