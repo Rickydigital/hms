@@ -137,7 +137,7 @@
                         </select>
 
                         <!-- Laravel Pagination Links (Bootstrap 5 style) -->
-                        {{ $report->appends(request()->query())->links() }}
+                        {{ $report->appends(request()->query())->links('pagination::bootstrap-5') }}
                     </div>
                 </div>
             </div>
