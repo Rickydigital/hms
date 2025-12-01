@@ -12,9 +12,10 @@ class ProfitReportController extends Controller
 {
     public function index()
     {
-        $report = $this->getProfitReport();
+        $profitData = $this->getProfitReport();
+        $report = collect($profitData['report'])->paginate(10);
 
-        return view('admin.profit-report', $report);
+        return view('admin.profit-report', ['report' => $report, 'summary' => $profitData['summary']]);
     }
 
     // app/Http/Controllers/Admin/ProfitReportController.php

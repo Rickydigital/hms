@@ -183,7 +183,7 @@
 
             <!-- PAGINATION -->
             <div class="card-footer bg-light border-top">
-                {{ $logs->appends(request()->query())->links() }}
+                {{ $logs->links('pagination::bootstrap-5')  }}
             </div>
         </div>
     </div>
