@@ -69,7 +69,7 @@
                     <tbody>
                         @forelse($revenues as $revenue)
                         <tr class="hover:bg-teal-50">
-                            <td class="fw-bold">{{ Carbon::parse($revenue['date'])->format('d M Y') }}</td>
+                            <td class="fw-bold">{{ \Carbon\Carbon::parse($revenue['date'])->format('d M Y') }}</td>
                             <td class="text-end fw-bold text-teal-700">
                                 Tsh {{ number_format($revenue['opd_revenue'], 0) }}
                             </td>

@@ -89,28 +89,7 @@
             </div>
         </div>
 
-        <!-- Revenue History Link Card -->
-<div class="col-xl-3 col-md-6 mb-4">
-    <a href="{{ route('admin.revenue') }}" class="text-decoration-none">
-        <div class="card border-left-teal shadow h-100 py-2 hover-lift" style="border-left-color: #20c997 !important;">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-teal text-uppercase mb-1">
-                            Revenue History
-                        </div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">
-                            View Daily Logs & Chart
-                        </div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </a>
-</div>
+        
 
     </div>
 
@@ -173,7 +152,7 @@
             </div>
         </div>
 
-        <!-- Profit & Loss Report Link Card (Same Size as Others) -->
+               <!-- Profit & Loss Report Link Card (Same Size as Others) -->
 <div class="col-xl-3 col-md-6 mb-4">
     <a href="{{ route('admin.profit-report') }}" class="text-decoration-none">
         <div class="card border-left-success shadow h-100 py-2 hover-lift" style="border-left-color: #1cc88a !important;">
