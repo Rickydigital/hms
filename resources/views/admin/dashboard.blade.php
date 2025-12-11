@@ -232,6 +232,13 @@
                         <span class="small fw-bold">Medicine Logs</span>
                     </a>
                 </div>
+
+                <div class="col-md-3 col-6">
+                <a href="{{ route('admin.revenue') }}" class="btn btn-outline-teal w-100 py-3 shadow-sm">
+                    <i class="bi bi-graph-up-arrow fs-4"></i><br>
+                    <span class="small fw-bold">Revenue History</span>
+                </a>
+            </div>
             </div>
         </div>
     </div>
