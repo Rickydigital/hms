@@ -14,6 +14,7 @@ use App\Models\Payment;
 use App\Models\PharmacySale;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 
 class DashboardController extends Controller
 {
@@ -59,6 +60,91 @@ class DashboardController extends Controller
         $data['top_medicines'] = $this->getTopSellingMedicines();
 
         return view('admin.dashboard', $data);
+    }
+
+    public function revenue()
+    {
+        $from = Carbon::parse(request('from', Carbon::today()->subMonth()))->startOfDay();
+        $to = Carbon::parse(request('to', Carbon::today()))->endOfDay();
+
+        $opdRevenues = Payment::select(
+            DB::raw('DATE(paid_at) as date'),
+            DB::raw('SUM(amount) as opd_revenue')
+        )
+            ->whereBetween('paid_at', [$from, $to])
+            ->groupBy('date')
+            ->pluck('opd_revenue', 'date');
+
+        $pharmacyRevenues = PharmacySale::select(
+            DB::raw('DATE(sold_at) as date'),
+            DB::raw('SUM(total_amount) as pharmacy_revenue')
+        )
+            ->whereBetween('sold_at', [$from, $to])
+            ->groupBy('date')
+            ->pluck('pharmacy_revenue', 'date');
+
+        $dates = collect(array_unique(array_merge($opdRevenues->keys()->toArray(), $pharmacyRevenues->keys()->toArray())))
+            ->sort()
+            ->values();
+
+        $revenues = $dates->map(function ($date) use ($opdRevenues, $pharmacyRevenues) {
+            $opd = $opdRevenues->get($date, 0);
+            $pharmacy = $pharmacyRevenues->get($date, 0);
+            return [
+                'date' => $date,
+                'opd_revenue' => $opd,
+                'pharmacy_revenue' => $pharmacy,
+                'total_revenue' => $opd + $pharmacy,
+            ];
+        })->sortByDesc('date');
+
+        // For pagination (if range is large)
+        $perPage = 30;
+        $page = request('page', 1);
+        $paginatedRevenues = new \Illuminate\Pagination\LengthAwarePaginator(
+            $revenues->forPage($page, $perPage),
+            $revenues->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+
+        // Chart data (sorted ascending for time series)
+        $chartLabels = $dates->map(fn($d) => Carbon::parse($d)->format('d M'));
+        $chartOpd = $dates->map(fn($d) => $opdRevenues->get($d, 0));
+        $chartPharmacy = $dates->map(fn($d) => $pharmacyRevenues->get($d, 0));
+        $chartTotal = $dates->map(fn($d) => $opdRevenues->get($d, 0) + $pharmacyRevenues->get($d, 0));
+
+        $revenueChart = [
+            'labels' => $chartLabels,
+            'datasets' => [
+                [
+                    'label' => 'OPD Revenue',
+                    'data' => $chartOpd,
+                    'borderColor' => 'rgba(75, 192, 192, 1)',
+                    'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
+                ],
+                [
+                    'label' => 'Pharmacy Revenue',
+                    'data' => $chartPharmacy,
+                    'borderColor' => 'rgba(153, 102, 255, 1)',
+                    'backgroundColor' => 'rgba(153, 102, 255, 0.2)',
+                ],
+                [
+                    'label' => 'Total Revenue',
+                    'data' => $chartTotal,
+                    'borderColor' => 'rgba(255, 159, 64, 1)',
+                    'backgroundColor' => 'rgba(255, 159, 64, 0.2)',
+                ],
+            ],
+        ];
+
+        return view('admin.revenue-history', [
+            'revenues' => $paginatedRevenues,
+            'revenue_chart' => $revenueChart,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+        ]);
     }
 
     private function getRevenueChart()

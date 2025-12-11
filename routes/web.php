@@ -28,6 +28,9 @@ Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'inde
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+    Route::get('/admin/revenue-history', [App\Http\Controllers\Admin\DashboardController::class, 'revenue'])
+    ->name('admin.revenue');
+
 Route::middleware('auth')->group(function () {
 
     Route::get('/pharmacy/medicines/search', [PharmacySaleController::class, 'search'])
