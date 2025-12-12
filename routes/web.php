@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/pharmacy/issue/{order}', [PharmacyController::class, 'issue'])->name('pharmacy.issue');
     Route::get('/pharmacy/history', [PharmacyController::class, 'history'])->name('pharmacy.history');
 
+    Route::get('/pharmacy/sales/search', [PharmacySaleController::class, 'search'])->name('pharmacy.sales.search');
     Route::prefix('pharmacy')->name('pharmacy.')->group(function () {
     Route::get('/sales/create', [PharmacySaleController::class, 'create'])->name('sales.create');
     Route::post('/sales', [PharmacySaleController::class, 'store'])->name('sales.store');
