@@ -188,102 +188,68 @@ class BillingController extends Controller
 }
 
     public function generateReceipt(Request $request, Visit $visit)
-    {
-        $view = $this->calculateBill($visit);
-        $data = $view->getData();
-
-        // Prevent duplicate receipt
-        if ($visit->receipt()->exists()) {
-            return back()->with('error', "Official receipt already generated for this visit!");
-        }
-
-        // Create the official receipt
-        $receipt = Receipt::create([
-            'visit_id'           => $visit->id,
-            'total_registration' => $data['regFee'],
-            'total_final'        => $data['grandTotal'],
-            'grand_total'        => $data['grandTotal'],
-            'generated_by'       => Auth::id(),
-            'generated_at'       => now(),
-        ]);
-
-        // RECORD FULL PAYMENT (this is the missing part!)
-        $payment = Payment::create([
-            'visit_id'       => $visit->id,
-            'amount'         => $data['grandTotal'],
-            'type'           => 'bill_payment',
-            'payment_method' => 'cash', // or let user choose later
-            'transaction_id' => null,
-            'received_by'    => Auth::id(),
-            'paid_at'        => now(),
-        ]);
-
-        // Copy bill items to payment details
-        $details = [];
-
-        if ($data['regFee'] > 0 && !$visit->receipt()->exists()) {
-            $details[] = [
-                'item_type'   => 'registration',
-                'item_name'   => 'Registration Fee',
-                'quantity'    => 1,
-                'unit_price'  => $data['regFee'],
-                'total_price' => $data['regFee'],
-            ];
-        }
-
-        if ($data['consultFee'] > 0 && !$visit->receipt()->exists()) {
-            $details[] = [
-                'item_type'   => 'consultation',
-                'item_name'   => 'Doctor Consultation - Dr. ' . ($visit->doctor->name ?? 'Unknown'),
-                'quantity'    => 1,
-                'unit_price'  => $data['consultFee'],
-                'total_price' => $data['consultFee'],
-            ];
-        }
-
-        foreach ($data['medicines'] as $order) {
-            $details[] = [
-                'item_type'   => 'medicine',
-                'item_name'   => $order->medicine->medicine_name,
-                'quantity'    => $order->quantity_issued ?? 1,
-                'unit_price'  => $order->medicine->price,
-                'total_price' => ($order->quantity_issued ?? 1) * $order->medicine->price,
-            ];
-
-            // Mark medicine as paid
-            $order->update([
-                'is_paid' => true,
-                'paid_at' => now(),
-                'paid_by' => Auth::id(),
-            ]);
-        }
-
-        foreach ($data['labTests'] as $test) {
-            $details[] = [
-                'item_type'   => 'lab_test',
-                'item_name'   => $test->test->test_name . ' (Lab Test)',
-                'quantity'    => 1,
-                'unit_price'  => $test->test->price,
-                'total_price' => $test->test->price,
-            ];
-
-            // Mark lab as paid
-            $test->update([
-                'is_paid' => true,
-                'paid_at' => now(),
-                'paid_by' => Auth::id(),
-            ]);
-        }
-
-        // Add other items (injections, bed) similarly if needed
-
-        // Save payment details
-        foreach ($details as $detail) {
-            PaymentDetail::create(array_merge($detail, ['payment_id' => $payment->id]));
-        }
-
-        return back()->with('success', "Official receipt and full payment recorded successfully!");
+{
+    // Only allow generating receipt ONCE (final bill)
+    if ($visit->receipt()->exists()) {
+        return back()->with('error', 'Official final receipt already generated!');
     }
+
+    $view = $this->calculateBill($visit);
+    $data = $view->getData();
+
+    if ($data['grandTotal'] <= 0) {
+        return back()->with('error', 'No pending amount to generate receipt for.');
+    }
+
+    // Create FINAL receipt
+    Receipt::create([
+        'visit_id'     => $visit->id,
+        'grand_total'  => $data['grandTotal'],
+        'generated_by' => Auth::id(),
+        'generated_at' => now(),
+    ]);
+
+    // Record FULL payment for remaining amount
+    $payment = Payment::create([
+        'visit_id'       => $visit->id,
+        'amount'         => $data['grandTotal'],
+        'type'           => 'final_payment',
+        'payment_method' => 'cash',
+        'received_by'    => Auth::id(),
+        'paid_at'        => now(),
+    ]);
+
+    // Save details (only current unpaid items)
+    $details = [];
+
+    foreach ($data['medicines'] as $order) {
+        $details[] = [
+            'item_type'   => 'medicine',
+            'item_name'   => $order->medicine->medicine_name,
+            'quantity'    => $order->quantity_issued ?? 1,
+            'unit_price'  => $order->medicine->price,
+            'total_price' => ($order->quantity_issued ?? 1) * $order->medicine->price,
+        ];
+        $order->update(['is_paid' => true, 'paid_at' => now(), 'paid_by' => Auth::id()]);
+    }
+
+    foreach ($data['labTests'] as $test) {
+        $details[] = [
+            'item_type'   => 'lab_test',
+            'item_name'   => $test->test->test_name . ' (Lab Test)',
+            'quantity'    => 1,
+            'unit_price'  => $test->test->price,
+            'total_price' => $test->test->price,
+        ];
+        $test->update(['is_paid' => true, 'paid_at' => now(), 'paid_by' => Auth::id()]);
+    }
+
+    foreach ($details as $detail) {
+        PaymentDetail::create(array_merge($detail, ['payment_id' => $payment->id]));
+    }
+
+    return back()->with('success', 'Final receipt generated and payment recorded!');
+}
 
     public function recordPayment(Request $request, Visit $visit)
     {
