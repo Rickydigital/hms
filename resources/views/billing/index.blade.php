@@ -131,24 +131,20 @@
                     </div>
 
                     <!-- Generate Receipt Button -->
-                    <div class="text-center mt-5">
-    @if(!$receiptGenerated)
-        @if($grandTotal > 0)
-            <button type="button" class="btn btn-primary btn-lg px-5 me-3" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                Record Partial Payment
+  <div class="text-center mt-5">
+    @if($showGenerateButton)
+        <button type="button" class="btn btn-primary btn-lg px-5 me-3" data-bs-toggle="modal" data-bs-target="#paymentModal">
+            Record Partial Payment
+        </button>
+        <form action="{{ route('billing.generate', $visit) }}" method="POST" class="d-inline">
+            @csrf
+            <button type="submit" class="btn btn-success btn-lg px-5 shadow">
+                Generate New Receipt (Current Items)
             </button>
-            <form action="{{ route('billing.generate', $visit) }}" method="POST" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-success btn-lg px-5 shadow">
-                    Generate Final Receipt (Full Payment)
-                </button>
-            </form>
-        @else
-            <div class="alert alert-info">All services paid</div>
-        @endif
+        </form>
     @else
         <div class="alert alert-success fs-5 px-5 py-3">
-            Final Receipt Generated • All Paid
+            All items paid • Visit complete
         </div>
     @endif
 </div>
