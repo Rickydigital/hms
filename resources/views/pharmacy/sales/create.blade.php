@@ -43,12 +43,12 @@
             <div class="card-header bg-teal text-white py-3 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Medicines to Sell</h5>
                 <button type="button" class="btn btn-light btn-sm" id="addItem">
-                    Add Item
+                    <i class="bi bi-plus-lg"></i> Add Item
                 </button>
             </div>
             <div class="card-body">
                 <div id="itemsContainer">
-                    <!-- Rows will be added here dynamically -->
+                    <!-- Dynamic rows added here -->
                 </div>
 
                 <div class="text-end mt-4">
@@ -65,7 +65,7 @@
                 <h5 class="mb-0">Payment</h5>
             </div>
             <div class="card-body">
-                <div class="row g-4">
+                <div class="row g-4 align-items-end">
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Amount Paid</label>
                         <input type="number" name="amount_paid" id="amountPaid" 
@@ -78,9 +78,9 @@
                             0
                         </div>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
-                        <button type="submit" class="btn btn-teal btn-lg w-100 shadow-lg">
-                            Complete Sale & Print Receipt
+                    <div class="col-md-4">
+                        <button type="submit" id="submitBtn" class="btn btn-teal btn-lg w-100 shadow-lg">
+                            <i class="bi bi-check2-circle"></i> Complete Sale & Print Receipt
                         </button>
                     </div>
                 </div>
@@ -89,40 +89,59 @@
     </form>
 </div>
 
-{{-- Hidden Template (Invisible - Only for cloning) --}}
-{{-- Replace the entire <template> options loop with this cleaner version --}}
+{{-- Hidden Template --}}
 <template id="itemTemplate">
-    <div class="item-row mb-4 p-4 border rounded bg-light position-relative">
+    <div class="item-row mb-4 p-4 border rounded bg-light position-relative border">
         <div class="row g-3 align-items-end">
             <div class="col-md-6">
                 <label class="form-label fw-bold">Medicine</label>
                 <select name="items[0][medicine_id]" class="form-select form-select-lg medicine-select" required>
-                    <option value="">Type to search medicine (in stock only)...</option>
+                    <option value="">Select medicine (in stock only)...</option>
+                    @foreach(\App\Models\MedicineMaster::active()
+                        ->withSum('batches', 'current_stock')
+                        ->having('batches_sum_current_stock', '>', 0)
+                        ->orderBy('medicine_name')
+                        ->get() as $med)
+
+                        @php
+                            $stock = $med->batches_sum_current_stock ?? 0;
+                        @endphp
+
+                        <option value="{{ $med->id }}"
+                                data-price="{{ $med->price }}"
+                                data-stock="{{ $stock }}">
+                            {{ $med->medicine_name }}
+                            @if($med->generic_name) • {{ $med->generic_name }} @endif
+                            (Stock: {{ $stock }} | Tsh {{ number_format((float)$med->price) }})
+                        </option>
+                    @endforeach
                 </select>
-                <small class="text-muted stock-info mt-1 d-block"></small>
+                <small class="text-muted stock-info mt-1 d-none"></small>
             </div>
             <div class="col-md-3">
                 <label class="form-label fw-bold">Quantity</label>
                 <input type="number" name="items[0][quantity]" class="form-control qty-input" min="1" value="1" required>
-                <small class="text-danger qty-warning mt-1" style="display:none;"></small>
+                <small class="text-danger qty-warning mt-1" style="display:none; font-weight:600;"></small>
             </div>
             <div class="col-md-2">
                 <label class="form-label fw-bold">Unit Price</label>
-                <input type="text" class="form-control price-display" readonly>
+                <input type="text" class="form-control price-display" readonly placeholder="0">
             </div>
             <div class="col-md-1 text-end">
-                <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
+                <button type="button" class="btn btn-danger btn-sm remove-item">
+                    <i class="bi bi-trash"></i>
+                </button>
             </div>
         </div>
         <div class="row mt-3">
-            <div class="col-md-12 text-end">
+            <div class="col-12 text-end">
                 <strong>Line Total: Tsh <span class="line-total">0</span></strong>
             </div>
         </div>
     </div>
 </template>
 
-{{-- Load jQuery + Select2 --}}
+{{-- Scripts --}}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -141,6 +160,10 @@
     .select2-container--default .select2-selection--single .select2-selection__arrow {
         height: 46px !important;
     }
+    .item-row.border-danger {
+        border-color: #dc3545 !important;
+        background-color: #fdf0f0;
+    }
 </style>
 
 <script>
@@ -150,7 +173,7 @@ function addNewRow() {
     const template = document.getElementById('itemTemplate').content.cloneNode(true);
     const row = template.querySelector('.item-row');
 
-    // Update index
+    // Update name indices
     row.querySelectorAll('[name*="items"]').forEach(el => {
         el.name = el.name.replace('[0]', '[' + itemIndex + ']');
     });
@@ -158,73 +181,69 @@ function addNewRow() {
     document.getElementById('itemsContainer').appendChild(row);
     itemIndex++;
 
-    const $select = $(row).find('.medicine-select');
-    const $qty = $(row).find('.qty-input');
-    const $stockInfo = $(row).find('.stock-info');
-    const $qtyWarning = $(row).find('.qty-warning');
+    const select = row.querySelector('.medicine-select');
+    const qtyInput = row.querySelector('.qty-input');
+    const priceDisplay = row.querySelector('.price-display');
+    const lineTotal = row.querySelector('.line-total');
+    const stockInfo = row.querySelector('.stock-info');
+    const qtyWarning = row.querySelector('.qty-warning');
 
-    // Initialize Select2 with AJAX
-    $select.select2({
-        placeholder: "Type to search medicine (in stock only)...",
+    // Initialize Select2
+    $(select).select2({
+        placeholder: "Select medicine (in stock only)...",
         allowClear: true,
-        width: '100%',
-        ajax: {
-            url: '{{ route("pharmacy.sales.search") }}',
-            dataType: 'json',
-            delay: 300,
-            data: function(params) {
-                return { q: params.term };
-            },
-            processResults: function(data) {
-                return { results: data };
-            }
-        }
+        width: '100%'
     });
 
-    // On medicine select
-    $select.on('select2:select', function(e) {
-        const data = e.params.data;
-        const priceInput = row.querySelector('.price-display');
-        priceInput.value = parseFloat(data.price).toLocaleString('en-TZ');
-
-        // Show stock
-        $stockInfo.text(`Available Stock: ${data.stock}`).removeClass('text-danger text-success')
-            .addClass(data.stock > 0 ? 'text-success' : 'text-danger');
-
-        // Set max qty
-        $qty.attr('max', data.stock);
-        if (parseInt($qty.val()) > data.stock) {
-            $qty.val(data.stock);
+    // On change
+    select.addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        if (!option.value) {
+            priceDisplay.value = '';
+            stockInfo.classList.add('d-none');
+            lineTotal.textContent = '0';
+            qtyInput.removeAttribute('max');
+            return;
         }
+
+        const price = parseFloat(option.dataset.price || 0);
+        const stock = parseInt(option.dataset.stock || 0);
+
+        priceDisplay.value = price.toLocaleString('en-TZ');
+        stockInfo.textContent = `Available Stock: ${stock}`;
+        stockInfo.classList.remove('d-none');
+        stockInfo.classList.toggle('text-success', stock > 5);
+        stockInfo.classList.toggle('text-warning', stock <= 5 && stock > 0);
+
+        qtyInput.max = stock;
+        if (parseInt(qtyInput.value) > stock) qtyInput.value = stock;
 
         validateQuantity();
         updateTotals();
     });
 
-    // Quantity validation
-    $qty.on('input', function() {
+    qtyInput.addEventListener('input', () => {
         validateQuantity();
         updateTotals();
     });
 
     function validateQuantity() {
-        const selected = $select.select2('data')[0];
-        const qty = parseInt($qty.val()) || 0;
-        const stock = selected ? selected.stock : 0;
+        const selectedOption = select.options[select.selectedIndex];
+        const qty = parseInt(qtyInput.value) || 0;
+        const stock = selectedOption ? parseInt(selectedOption.dataset.stock || 0) : 0;
 
-        if (selected && qty > stock) {
-            $qtyWarning.text(`Only ${stock} in stock!`).show();
+        if (selectedOption && qty > stock) {
+            qtyWarning.textContent = `Only ${stock} in stock!`;
+            qtyWarning.style.display = 'block';
             row.classList.add('border-danger');
         } else {
-            $qtyWarning.text('').hide();
+            qtyWarning.style.display = 'none';
             row.classList.remove('border-danger');
         }
-
         toggleSubmitButton();
     }
 
-    // Remove row
-    row.querySelector('.remove-item').addEventListener('click', function() {
+    row.querySelector('.remove-item').addEventListener('click', () => {
         row.remove();
         updateTotals();
         toggleSubmitButton();
@@ -238,58 +257,58 @@ function updateTotals() {
     let hasError = false;
 
     document.querySelectorAll('.item-row').forEach(row => {
-        const $select = $(row).find('.medicine-select');
-        const selected = $select.select2('data')[0];
+        const select = row.querySelector('.medicine-select');
+        const option = select.options[select.selectedIndex];
         const qty = parseInt(row.querySelector('.qty-input').value) || 0;
-        const price = selected ? parseFloat(selected.price || 0) : 0;
-        const lineTotal = qty * price;
+        const price = option ? parseFloat(option.dataset.price || 0) : 0;
+        const lineTotalValue = qty * price;
 
-        row.querySelector('.price-display').value = price.toLocaleString('en-TZ');
-        row.querySelector('.line-total').textContent = lineTotal.toLocaleString('en-TZ');
-        grandTotal += lineTotal;
+        row.querySelector('.line-total').textContent = lineTotalValue.toLocaleString('en-TZ');
+        grandTotal += lineTotalValue;
 
-        if (selected && qty > selected.stock) hasError = true;
+        if (option && qty > parseInt(option.dataset.stock || 0)) {
+            hasError = true;
+        }
     });
 
     document.getElementById('grandTotal').textContent = grandTotal.toLocaleString('en-TZ');
     document.getElementById('amountPaid').value = grandTotal;
     calculateChange();
-
     toggleSubmitButton(hasError);
 }
 
 function toggleSubmitButton(hasError = false) {
     const rows = document.querySelectorAll('.item-row');
     const hasItems = rows.length > 0;
-    const anySelected = Array.from(rows).some(r => $(r).find('.medicine-select').val());
+    const hasSelection = Array.from(rows).some(r => r.querySelector('.medicine-select').value);
 
-    const submitBtn = document.querySelector('button[type="submit"]');
-    const error = hasError || !hasItems || !anySelected;
+    const submitBtn = document.getElementById('submitBtn');
+    const disabled = hasError || !hasItems || !hasSelection;
 
-    submitBtn.disabled = error;
-    submitBtn.innerHTML = error
-        ? '<i class="bi bi-exclamation-triangle"></i> Fix errors or add items'
-        : 'Complete Sale & Print Receipt';
+    submitBtn.disabled = disabled;
 
-    if (error) {
+    if (disabled) {
         submitBtn.classList.remove('btn-teal');
         submitBtn.classList.add('btn-secondary');
+        submitBtn.innerHTML = hasError
+            ? '<i class="bi bi-exclamation-triangle"></i> Insufficient stock in one or more items'
+            : '<i class="bi bi-cart"></i> Please add items to proceed';
     } else {
         submitBtn.classList.remove('btn-secondary');
         submitBtn.classList.add('btn-teal');
+        submitBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Complete Sale & Print Receipt';
     }
 }
 
 function calculateChange() {
     const total = parseFloat(document.getElementById('grandTotal').textContent.replace(/,/g, '')) || 0;
     const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
-    const change = paid - total;
-    document.getElementById('changeDue').textContent = change >= 0 ? change.toLocaleString('en-TZ') : '0';
+    const change = paid >= total ? paid - total : 0;
+    document.getElementById('changeDue').textContent = change.toLocaleString('en-TZ');
 }
 
 $(document).ready(function() {
     addNewRow();
-
     document.getElementById('addItem').addEventListener('click', addNewRow);
     document.getElementById('amountPaid').addEventListener('input', calculateChange);
 });
