@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Auth;
 
 class BillingController extends Controller
 {
-    // Main page: shows pending list + search
     public function index()
     {
         $pendingVisits = Visit::with(['patient', 'doctor'])
@@ -83,13 +82,13 @@ class BillingController extends Controller
         $regFee     = Setting::get('registration_fee', 0);
         $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
 
-        // Only issued medicines
-        $medicines  = $visit->medicineIssues()
-                        ->whereNotNull('pharmacy_issues.issued_at')
-                        ->get();
+        // Only issued medicines (pharmacy has already given)
+        $medicines = $visit->medicineIssues()
+            ->whereNotNull('pharmacy_issues.issued_at')
+            ->get();
 
-        // Only completed lab tests
-        $labTests   = $visit->labOrders()->where('is_completed', true)->get();
+        // ALL lab tests ordered by doctor (appears immediately!)
+        $labTests = $visit->labOrders()->with('test')->get();
 
         // Only given injections
         $injections = $visit->injectionOrders()->where('is_given', true)->get();
@@ -104,12 +103,13 @@ class BillingController extends Controller
 
         $grandTotal = $regFee + $consultFee
                     + $medicines->sum('total_amount')
-                    + $labTests->sum(fn($t) => $t->test->price)
+                    + $labTests->sum(fn($t) => $t->test->price)   // All ordered lab tests
                     + $injections->sum(fn($i) => $i->medicine->price)
                     + $bedCharges;
 
         $receiptGenerated = $visit->receipt()->exists();
 
+        // Re-fetch for sidebar
         $pendingVisits = Visit::with(['patient', 'doctor'])
             ->where('all_services_completed', true)
             ->whereDoesntHave('receipt')
@@ -177,7 +177,6 @@ class BillingController extends Controller
         $view = $this->calculateBill($visit);
         $data = $view->getData();
 
-        // Create payment record
         $payment = Payment::create([
             'visit_id'        => $visit->id,
             'amount'          => $request->amount,
@@ -222,34 +221,31 @@ class BillingController extends Controller
                 'total_price' => $item->total_amount,
             ];
 
-            // Mark medicine order as paid
             VisitMedicineOrder::where('visit_id', $visit->id)
                 ->where('medicine_id', $item->medicine->id)
                 ->update([
-                    'is_paid'   => true,
-                    'paid_at'   => now(),
-                    'paid_by'   => Auth::id(),
+                    'is_paid' => true,
+                    'paid_at' => now(),
+                    'paid_by' => Auth::id(),
                 ]);
         }
 
-        // 4. Lab Tests – Only completed ones
+        // 4. Lab Tests – ALL ordered tests (not just completed!)
         foreach ($data['labTests'] as $test) {
             $details[] = [
                 'item_type'   => 'lab_test',
-                'item_name'   => $test->test->test_name,
+                'item_name'   => $test->test->test_name . ' (Lab Test)',
                 'quantity'    => 1,
                 'unit_price'  => $test->test->price,
                 'total_price' => $test->test->price,
             ];
 
-            // Mark lab order as paid
-            VisitLabOrder::where('visit_id', $visit->id)
-                ->where('lab_test_id', $test->test->id)
-                ->update([
-                    'is_paid'   => true,
-                    'paid_at'   => now(),
-                    'paid_by'   => Auth::id(),
-                ]);
+            // Mark as paid when payment is recorded
+            $test->update([
+                'is_paid' => true,
+                'paid_at' => now(),
+                'paid_by' => Auth::id(),
+            ]);
         }
 
         // 5. Injections
@@ -274,7 +270,7 @@ class BillingController extends Controller
             ];
         }
 
-        // Save all payment details
+        // Save payment details
         foreach ($details as $detail) {
             PaymentDetail::create(array_merge($detail, [
                 'payment_id' => $payment->id
