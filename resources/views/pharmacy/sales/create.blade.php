@@ -90,36 +90,28 @@
 </div>
 
 {{-- Hidden Template (Invisible - Only for cloning) --}}
+{{-- Replace the entire <template> options loop with this cleaner version --}}
 <template id="itemTemplate">
     <div class="item-row mb-4 p-4 border rounded bg-light position-relative">
         <div class="row g-3 align-items-end">
             <div class="col-md-6">
                 <label class="form-label fw-bold">Medicine</label>
                 <select name="items[0][medicine_id]" class="form-select form-select-lg medicine-select" required>
-                    <option value="">Type to search medicine...</option>
-                    @foreach(\App\Models\MedicineMaster::active()->orderBy('medicine_name')->get() as $med)
-                        <option value="{{ $med->id }}"
-                                data-price="{{ $med->price }}"
-                                data-stock="{{ $med->currentStock() }}">
-                            {{ $med->medicine_name }}
-                            @if($med->generic_name) • {{ $med->generic_name }} @endif
-                            (Stock: {{ $med->currentStock() }} | Tsh {{ number_format((float)$med->price) }})
-                        </option>
-                    @endforeach
+                    <option value="">Type to search medicine (in stock only)...</option>
                 </select>
+                <small class="text-muted stock-info mt-1 d-block"></small>
             </div>
             <div class="col-md-3">
                 <label class="form-label fw-bold">Quantity</label>
                 <input type="number" name="items[0][quantity]" class="form-control qty-input" min="1" value="1" required>
+                <small class="text-danger qty-warning mt-1" style="display:none;"></small>
             </div>
             <div class="col-md-2">
                 <label class="form-label fw-bold">Unit Price</label>
                 <input type="text" class="form-control price-display" readonly>
             </div>
             <div class="col-md-1 text-end">
-                <button type="button" class="btn btn-danger btn-sm remove-item">
-                    Remove
-                </button>
+                <button type="button" class="btn btn-danger btn-sm remove-item">Remove</button>
             </div>
         </div>
         <div class="row mt-3">
@@ -158,63 +150,134 @@ function addNewRow() {
     const template = document.getElementById('itemTemplate').content.cloneNode(true);
     const row = template.querySelector('.item-row');
 
-    // Update index in name attributes
+    // Update index
     row.querySelectorAll('[name*="items"]').forEach(el => {
         el.name = el.name.replace('[0]', '[' + itemIndex + ']');
     });
 
-    // Reset values
-    row.querySelector('.qty-input').value = 1;
-    row.querySelector('.price-display').value = '';
-    row.querySelector('.line-total').textContent = '0';
-
     document.getElementById('itemsContainer').appendChild(row);
     itemIndex++;
 
-    // Initialize Select2
-    $(row).find('.medicine-select').select2({
-        placeholder: "Type to search medicine...",
+    const $select = $(row).find('.medicine-select');
+    const $qty = $(row).find('.qty-input');
+    const $stockInfo = $(row).find('.stock-info');
+    const $qtyWarning = $(row).find('.qty-warning');
+
+    // Initialize Select2 with AJAX
+    $select.select2({
+        placeholder: "Type to search medicine (in stock only)...",
         allowClear: true,
-        width: '100%'
+        width: '100%',
+        ajax: {
+            url: '{{ route("pharmacy.sales.search") }}',
+            dataType: 'json',
+            delay: 300,
+            data: function(params) {
+                return { q: params.term };
+            },
+            processResults: function(data) {
+                return { results: data };
+            }
+        }
     });
 
-    // Attach events
-    attachRowEvents(row);
-    updateTotals();
-}
+    // On medicine select
+    $select.on('select2:select', function(e) {
+        const data = e.params.data;
+        const priceInput = row.querySelector('.price-display');
+        priceInput.value = parseFloat(data.price).toLocaleString('en-TZ');
 
-function attachRowEvents(row) {
-    const select = row.querySelector('.medicine-select');
-    const qty = row.querySelector('.qty-input');
+        // Show stock
+        $stockInfo.text(`Available Stock: ${data.stock}`).removeClass('text-danger text-success')
+            .addClass(data.stock > 0 ? 'text-success' : 'text-danger');
 
-    select.addEventListener('change', updateTotals);
-    qty.addEventListener('input', updateTotals);
+        // Set max qty
+        $qty.attr('max', data.stock);
+        if (parseInt($qty.val()) > data.stock) {
+            $qty.val(data.stock);
+        }
 
-    row.querySelector('.remove-item').addEventListener('click', function () {
-        row.remove();
+        validateQuantity();
         updateTotals();
     });
+
+    // Quantity validation
+    $qty.on('input', function() {
+        validateQuantity();
+        updateTotals();
+    });
+
+    function validateQuantity() {
+        const selected = $select.select2('data')[0];
+        const qty = parseInt($qty.val()) || 0;
+        const stock = selected ? selected.stock : 0;
+
+        if (selected && qty > stock) {
+            $qtyWarning.text(`Only ${stock} in stock!`).show();
+            row.classList.add('border-danger');
+        } else {
+            $qtyWarning.text('').hide();
+            row.classList.remove('border-danger');
+        }
+
+        toggleSubmitButton();
+    }
+
+    // Remove row
+    row.querySelector('.remove-item').addEventListener('click', function() {
+        row.remove();
+        updateTotals();
+        toggleSubmitButton();
+    });
+
+    updateTotals();
 }
 
 function updateTotals() {
     let grandTotal = 0;
+    let hasError = false;
 
     document.querySelectorAll('.item-row').forEach(row => {
-        const select = row.querySelector('.medicine-select');
-        const option = select.options[select.selectedIndex];
-        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-        const price = option ? parseFloat(option.dataset.price || 0) : 0;
+        const $select = $(row).find('.medicine-select');
+        const selected = $select.select2('data')[0];
+        const qty = parseInt(row.querySelector('.qty-input').value) || 0;
+        const price = selected ? parseFloat(selected.price || 0) : 0;
         const lineTotal = qty * price;
 
         row.querySelector('.price-display').value = price.toLocaleString('en-TZ');
         row.querySelector('.line-total').textContent = lineTotal.toLocaleString('en-TZ');
         grandTotal += lineTotal;
+
+        if (selected && qty > selected.stock) hasError = true;
     });
 
     document.getElementById('grandTotal').textContent = grandTotal.toLocaleString('en-TZ');
     document.getElementById('amountPaid').value = grandTotal;
-
     calculateChange();
+
+    toggleSubmitButton(hasError);
+}
+
+function toggleSubmitButton(hasError = false) {
+    const rows = document.querySelectorAll('.item-row');
+    const hasItems = rows.length > 0;
+    const anySelected = Array.from(rows).some(r => $(r).find('.medicine-select').val());
+
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const error = hasError || !hasItems || !anySelected;
+
+    submitBtn.disabled = error;
+    submitBtn.innerHTML = error
+        ? '<i class="bi bi-exclamation-triangle"></i> Fix errors or add items'
+        : 'Complete Sale & Print Receipt';
+
+    if (error) {
+        submitBtn.classList.remove('btn-teal');
+        submitBtn.classList.add('btn-secondary');
+    } else {
+        submitBtn.classList.remove('btn-secondary');
+        submitBtn.classList.add('btn-teal');
+    }
 }
 
 function calculateChange() {
@@ -224,9 +287,8 @@ function calculateChange() {
     document.getElementById('changeDue').textContent = change >= 0 ? change.toLocaleString('en-TZ') : '0';
 }
 
-// Add first row on load
-$(document).ready(function () {
-    addNewRow(); // Automatically add one row when page loads
+$(document).ready(function() {
+    addNewRow();
 
     document.getElementById('addItem').addEventListener('click', addNewRow);
     document.getElementById('amountPaid').addEventListener('input', calculateChange);
