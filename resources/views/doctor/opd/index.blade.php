@@ -30,6 +30,10 @@
         background: linear-gradient(135deg, var(--primary), #3f37c9) !important;
     }
 
+    .opd-page .bg-gradient-success {
+        background: linear-gradient(135deg, var(--success), #27ae60) !important;
+    }
+
     .opd-page .vital-badge {
         width: 70px; height: 70px;
         border-radius: 50%;
@@ -76,6 +80,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        cursor: pointer;
     }
 
     .opd-page .section-title {
@@ -156,7 +161,7 @@
 
                     <div class="card-body p-4 p-xl-5">
 
-                        <!-- PATIENT + VITALS (Compact Display Only – No Modal) -->
+                        <!-- PATIENT + VITALS -->
                         <div class="row g-4 mb-5">
                             <div class="col-xl-7">
                                 <div class="card h-100">
@@ -173,7 +178,6 @@
                                 </div>
                             </div>
 
-                            <!-- VITALS – Beautiful Display Only (No Editing) -->
                             <div class="col-xl-5">
                                 <div class="card">
                                     <div class="card-body text-center">
@@ -192,94 +196,95 @@
                             </div>
                         </div>
 
-                        <!-- VITALS MODAL COMPLETELY REMOVED – NO MORE MISBEHAVIOR! -->
-
-
-                             {{-- LAB RESULTS – ONLY SHOW IF ANY COMPLETED --}}
-@if($visit->labOrders->where('is_completed', true)->count() > 0)
-    <div class="card mb-5 border-0 shadow-lg rounded-4">
-        <div class="card-header bg-gradient-success text-white py-4 rounded-top-4">
-            <h5 class="mb-0 d-flex align-items-center">
-                Lab Results • {{ $visit->labOrders->where('is_completed', true)->count() }} Completed
-            </h5>
-        </div>
-        <div class="card-body p-4">
-            <div class="row g-4">
-                @foreach($visit->labOrders->where('is_completed', true) as $order)
-                    @if($order->result)
-                        <div class="col-md-6 col-lg-4">
-                            <div class="border rounded-4 p-4 shadow-sm h-100 
-                                       {{ $order->result->is_abnormal ? 'border-danger bg-danger-subtle' : 'border-success bg-light' }}">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <h6 class="fw-bold text-primary mb-0">{{ $order->test->test_name }}</h6>
-                                    @if($order->result->is_abnormal)
-                                        <span class="badge bg-danger fs-6 animate__animated animate__pulse animate__infinite">
-                                            ABNORMAL
-                                        </span>
-                                    @else
-                                        <span class="badge bg-success">Normal</span>
-                                    @endif
+                        {{-- COMPLETED LAB RESULTS --}}
+                        @if($visit->labOrders->where('is_completed', true)->count() > 0)
+                            <div class="card mb-5 border-0 shadow-lg rounded-4">
+                                <div class="card-header bg-gradient-success text-white py-4 rounded-top-4">
+                                    <h5 class="mb-0">Lab Results • {{ $visit->labOrders->where('is_completed', true)->count() }} Completed</h5>
                                 </div>
-
-                                <div class="mt-3">
-                                    @if($order->result->result_value)
-                                        <div class="fs-4 fw-bold text-dark">
-                                            {{ $order->result->result_value }}
-                                            <small class="text-muted fs-6">({{ $order->result->normal_range ?? '—' }})</small>
-                                        </div>
-                                    @elseif($order->result->result_text)
-                                        <div class="alert alert-info py-2 px-3 mb-0">
-                                            {{ $order->result->result_text }}
-                                        </div>
-                                    @endif
-
-                                    @if($order->result->remarks)
-                                        <small class="text-muted d-block mt-2">
-                                            <strong>Remark:</strong> {{ $order->result->remarks }}
-                                        </small>
-                                    @endif
-
-                                    <small class="text-muted d-block mt-3">
-                                        Reported by: {{ $order->result->technician?->name ?? 'Lab' }}
-                                        • {{ $order->result->reported_at?->format('d M Y • h:i A') }}
-                                    </small>
+                                <div class="card-body p-4">
+                                    <div class="row g-4">
+                                        @foreach($visit->labOrders->where('is_completed', true) as $order)
+                                            @if($order->result)
+                                                <div class="col-md-6 col-lg-4">
+                                                    <div class="border rounded-4 p-4 shadow-sm h-100 {{ $order->result->is_abnormal ? 'border-danger bg-danger-subtle' : 'border-success bg-light' }}">
+                                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                                            <h6 class="fw-bold text-primary mb-0">{{ $order->test->test_name }}</h6>
+                                                            @if($order->result->is_abnormal)
+                                                                <span class="badge bg-danger fs-6">ABNORMAL</span>
+                                                            @else
+                                                                <span class="badge bg-success">Normal</span>
+                                                            @endif
+                                                        </div>
+                                                        <div class="mt-3">
+                                                            @if($order->result->result_value)
+                                                                <div class="fs-4 fw-bold text-dark">
+                                                                    {{ $order->result->result_value }}
+                                                                    <small class="text-muted fs-6">({{ $order->result->normal_range ?? '—' }})</small>
+                                                                </div>
+                                                            @elseif($order->result->result_text)
+                                                                <div class="alert alert-info py-2 px-3 mb-0">{{ $order->result->result_text }}</div>
+                                                            @endif
+                                                            @if($order->result->remarks)
+                                                                <small class="text-muted d-block mt-2"><strong>Remark:</strong> {{ $order->result->remarks }}</small>
+                                                            @endif
+                                                            <small class="text-muted d-block mt-3">
+                                                                Reported by: {{ $order->result->technician?->name ?? 'Lab' }}
+                                                                • {{ $order->result->reported_at?->format('d M Y • h:i A') }}
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    @endif
-                @endforeach
-            </div>
-        </div>
-    </div>
-@endif
+                        @endif
 
-{{-- PENDING LAB TESTS – SHOW IF ANY NOT COMPLETED --}}
-@if($visit->labOrders->where('is_completed', false)->count() > 0)
-    <div class="card mb-5 border-0 shadow-sm border-warning">
-        <div class="card-header bg-warning text-dark py-3">
-            <h6 class="mb-0">
-                Pending Lab Tests ({{ $visit->labOrders->where('is_completed', false)->count() }})
-            </h6>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                @foreach($visit->labOrders->where('is_completed', false) as $order)
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center p-3 bg-light rounded-3 border-start border-warning border-5">
-                            <div class="flex-grow-1">
-                                <strong>{{ $order->test->test_name }}</strong>
-                                @if($order->extra_instruction)
-                                    <br><small class="text-info">{{ $order->extra_instruction }}</small>
-                                @endif
+                        {{-- PENDING LAB TESTS WITH PAYMENT STATUS --}}
+                        @if($visit->labOrders->where('is_completed', false)->count() > 0)
+                            <div class="card mb-5 border-0 shadow-sm {{ $visit->labOrders->where('is_completed', false)->where('is_paid', false)->count() > 0 ? 'border-danger' : 'border-warning' }}">
+                                <div class="card-header {{ $visit->labOrders->where('is_completed', false)->where('is_paid', false)->count() > 0 ? 'bg-danger' : 'bg-warning' }} text-white py-3">
+                                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                                        Pending Lab Tests ({{ $visit->labOrders->where('is_completed', false)->count() }})
+                                        @if($visit->labOrders->where('is_completed', false)->where('is_paid', false)->count() > 0)
+                                            <span class="badge bg-white text-danger fs-6">Payment Required</span>
+                                        @else
+                                            <span class="badge bg-white text-dark fs-6">Paid • Awaiting Result</span>
+                                        @endif
+                                    </h6>
+                                </div>
+                                <div class="card-body p-4">
+                                    <div class="row g-3">
+                                        @foreach($visit->labOrders->where('is_completed', false) as $order)
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center p-3 rounded-3 {{ $order->is_paid ? 'bg-light' : 'bg-danger bg-opacity-10' }} border-start {{ $order->is_paid ? 'border-success' : 'border-danger' }} border-5">
+                                                    <div class="flex-grow-1">
+                                                        <strong>{{ $order->test->test_name }}</strong>
+                                                        @if($order->extra_instruction)
+                                                            <br><small class="text-info">{{ $order->extra_instruction }}</small>
+                                                        @endif
+                                                    </div>
+                                                    <div>
+                                                        @if($order->is_paid)
+                                                            <span class="badge bg-success">PAID</span>
+                                                        @else
+                                                            <span class="badge bg-danger">NOT PAID</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    @if($visit->labOrders->where('is_completed', false)->where('is_paid', false)->count() > 0)
+                                        <div class="alert alert-danger mt-4 mb-0">
+                                            <strong>Important:</strong> Patient must pay at the billing counter before lab can process these tests.
+                                        </div>
+                                    @endif
+                                </div>
                             </div>
-                            <span class="badge bg-warning text-dark">Pending</span>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    </div>
-@endif
+                        @endif
 
                         <form action="{{ route('doctor.prescription.store', $visit) }}" method="POST" id="prescriptionForm">
                             @csrf
@@ -305,18 +310,18 @@
                                 </div>
                             </div>
 
-                         <h5 class="text-primary mb-4">Send Patient To</h5>
+                            <h5 class="text-primary mb-4">Send Patient To</h5>
                             <div class="row g-4">
 
-                                <!-- LAB TESTS – CLEAN CARD STYLE -->
+                                <!-- LAB TESTS -->
                                 <div class="col-md-6">
                                     <div class="card">
                                         <div class="card-body">
                                             <h6 class="section-title text-info">Lab Tests (Optional)</h6>
                                             <div id="labContainer">
                                                 <template id="labTemplate">
-                                                    <div class="prescription-item">
-                                                        <button type="button" class="remove-prescription">×</button>
+                                                    <div class="prescription-item position-relative mb-3 p-3 bg-light rounded-3 border">
+                                                        <button type="button" class="remove-prescription position-absolute top-0 end-0 btn btn-sm btn-danger rounded-circle m-2">×</button>
                                                         <select name="lab_tests[]" class="form-select form-select-lg">
                                                             <option value="">Choose Lab Test</option>
                                                             @foreach(\App\Models\LabTestMaster::active()->orderBy('test_name')->get() as $test)
@@ -332,57 +337,55 @@
                                     </div>
                                 </div>
 
-                                <!-- MEDICINES – ULTRA BEAUTIFUL & SPACIOUS -->
+                                <!-- MEDICINES -->
                                 <div class="col-md-6">
                                     <div class="card">
                                         <div class="card-body">
                                             <h6 class="section-title text-success">Medicines (Optional)</h6>
                                             <div id="medicineContainer">
                                                 <template id="medicineTemplate">
-    <div class="item-card position-relative mb-4 p-5 rounded-4 border border-primary border-opacity-10">
-        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">×</button>
+                                                    <div class="item-card position-relative mb-4 p-5 rounded-4 border border-primary border-opacity-10">
+                                                        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">×</button>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-primary fs-5">Medicine Name</label>
-            <select name="medicines[][medicine_id]" class="form-select form-select-lg select2-medicine" style="width:100%;">
-                <option value="">Search medicine...</option>
-                @foreach(\App\Models\MedicineMaster::active()->get() as $m)
-                    <option value="{{ $m->id }}">
-                        {{ $m->medicine_name }} @if($m->generic_name) • {{ $m->generic_name }} @endif
-                        @if($m->strength) • {{ $m->strength }} @endif
-                      
-                    </option>
-                @endforeach
-            </select>
-        </div>
+                                                        <div class="mb-4">
+                                                            <label class="form-label fw-bold text-primary fs-5">Medicine Name</label>
+                                                            <select name="medicines[][medicine_id]" class="form-select form-select-lg select2-medicine" style="width:100%;">
+                                                                <option value="">Search medicine...</option>
+                                                                @foreach(\App\Models\MedicineMaster::active()->get() as $m)
+                                                                    <option value="{{ $m->id }}">
+                                                                        {{ $m->medicine_name }} @if($m->generic_name) • {{ $m->generic_name }} @endif
+                                                                        @if($m->strength) • {{ $m->strength }} @endif
+                                                                    </option>
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-info">Dosage</label>
-            <input type="text" name="medicines[][dosage]" class="form-control form-control-lg text-center fw-bold fs-4" 
-                   placeholder="e.g. 1-0-1 or 1 tab twice daily">
-        </div>
+                                                        <div class="mb-4">
+                                                            <label class="form-label fw-bold text-info">Dosage</label>
+                                                            <input type="text" name="medicines[][dosage]" class="form-control form-control-lg text-center fw-bold fs-4" 
+                                                                   placeholder="e.g. 1-0-1 or 1 tab twice daily">
+                                                        </div>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-warning">Duration (Days)</label>
-            <input type="number" name="medicines[][duration_days]" min="1" class="form-control form-control-lg text-center fw-bold fs-4" 
-                   placeholder="5">
-        </div>
+                                                        <div class="mb-4">
+                                                            <label class="form-label fw-bold text-warning">Duration (Days)</label>
+                                                            <input type="number" name="medicines[][duration_days]" min="1" class="form-control form-control-lg text-center fw-bold fs-4" 
+                                                                   placeholder="5">
+                                                        </div>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-purple">Frequency / Timing</label>
-            <input type="text" name="medicines[][instruction]" class="form-control form-control-lg" 
-                   placeholder="e.g. After food, Before sleep, SOS, With water...">
-        </div>
+                                                        <div class="mb-4">
+                                                            <label class="form-label fw-bold text-purple">Frequency / Timing</label>
+                                                            <input type="text" name="medicines[][instruction]" class="form-control form-control-lg" 
+                                                                   placeholder="e.g. After food, Before sleep, SOS, With water...">
+                                                        </div>
 
-        <div class="mt-4">
-            <label class="form-label text-success fw-bold">Additional Instruction (Optional)</label>
-            <textarea name="medicines[][extra_instruction]" class="form-control" rows="3" 
-                      placeholder="Take with plenty of water, Avoid dairy, etc..."></textarea>
-        </div>
-    </div>
-</template>
+                                                        <div class="mt-4">
+                                                            <label class="form-label text-success fw-bold">Additional Instruction (Optional)</label>
+                                                            <textarea name="medicines[][extra_instruction]" class="form-control" rows="3" 
+                                                                      placeholder="Take with plenty of water, Avoid dairy, etc..."></textarea>
+                                                        </div>
+                                                    </div>
+                                                </template>
                                             </div>
-
                                             <button type="button" id="addMedicineRow" class="btn btn-success rounded-pill px-5 py-3 mt-3 shadow">
                                                 Add Medicine
                                             </button>
@@ -402,7 +405,7 @@
                                                 @endforeach
                                             </select>
                                             <input type="text" name="injection_route" id="injection_route" class="form-control form-control-lg" 
-                                                   placeholder="Route: IV / IM / SC / IV Push" readonly value="{{ old('injection_route') }}">
+                                                   placeholder="Route: IV / IM / SC / IV Push" readonly>
                                         </div>
                                     </div>
                                 </div>
@@ -419,7 +422,7 @@
                                                 @endforeach
                                             </select>
                                             <textarea name="admission_reason" id="admission_reason" class="form-control" rows="3" 
-                                                      placeholder="Reason for admission..." readonly>{{ old('admission_reason') }}</textarea>
+                                                      placeholder="Reason for admission..." readonly></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -441,14 +444,16 @@
                 <div class="text-center py-5 my-5">
                     <h1 class="display-5 text-primary fw-bold">Welcome, Dr. {{ auth()->user()->name }}!</h1>
                     <p class="lead text-muted mt-3">Ready to heal with love and care</p>
+                    <i class="bi bi-heart-pulse display-1 text-primary mt-4"></i>
                 </div>
             @endif
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<!-- Select2 CSS & JS -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -482,13 +487,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     toggleInjectionField();
     toggleAdmissionField();
+
     injMedSelect?.addEventListener('change', toggleInjectionField);
     wardSelect?.addEventListener('change', toggleAdmissionField);
 
+    // Add Medicine Row
     document.getElementById('addMedicineRow')?.addEventListener('click', function () {
         const template = document.getElementById('medicineTemplate').content.cloneNode(true);
         const row = template.querySelector('.item-card');
         document.getElementById('medicineContainer').appendChild(row);
+
         $(row).find('.select2-medicine').select2({
             placeholder: "Search medicine...",
             allowClear: true,
@@ -496,11 +504,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // Add Lab Test
     document.getElementById('addLabTest')?.addEventListener('click', function () {
         const template = document.getElementById('labTemplate').content.cloneNode(true);
-        document.getElementById('labContainer').appendChild(template);
+        const item = template.querySelector('.prescription-item');
+        document.getElementById('labContainer').appendChild(item);
     });
 
+    // Remove items
     document.addEventListener('click', function (e) {
         if (e.target.classList.contains('remove-item') || e.target.closest('.remove-item')) {
             e.target.closest('.item-card')?.remove();
@@ -510,6 +521,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Form validation before submit
     form.addEventListener('submit', function (e) {
         let hasError = false;
 
@@ -533,12 +545,11 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 card.remove();
             }
-            
         });
 
         document.querySelectorAll('#labContainer .prescription-item').forEach(item => {
             const select = item.querySelector('select');
-            if (!select || !select.value) item.remove();
+            if (select && !select.value) item.remove();
         });
 
         if (!injMedSelect.value) injRouteInput.value = '';
@@ -546,11 +557,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (hasError) {
             e.preventDefault();
-            return false;
         }
     });
 
+    // Auto-add one medicine row on load
     setTimeout(() => document.getElementById('addMedicineRow')?.click(), 100);
 });
 </script>
+
 @endsection
