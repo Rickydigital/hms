@@ -47,9 +47,9 @@
                         </div>
                         <div class="col-md-6 text-md-end">
                             <p><strong>Visit ID:</strong> #{{ $visit->id }}</p>
-                            @if($receiptGenerated)
+                            {{--  @if($receiptGenerated)
                                 <span class="badge bg-success fs-5 px-4">Receipt Generated</span>
-                            @endif
+                            @endif  --}}
                         </div>
                     </div>
 
