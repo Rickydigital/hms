@@ -89,61 +89,49 @@ class BillingController extends Controller
         return $this->calculateBill($visit);
     }
 
-    private function calculateBill($visit)
+ private function calculateBill($visit)
 {
     $regFee     = Setting::get('registration_fee', 0);
     $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
 
-    // 1. Medicines: Only issued ones
     $medicines = $visit->medicineOrders()
         ->where('is_issued', true)
         ->with('medicine')
         ->get();
 
-    // 2. Lab Tests: Only UNPAID ones
     $labTests = $visit->labOrders()
         ->where('is_paid', false)
         ->with('test')
         ->get();
 
-    // 3. Injections: Only if not paid (add is_paid flag later if needed)
     $injections = $visit->injectionOrders()->where('is_given', true)->get();
 
     $bedAdmission = $visit->bedAdmission()->where('is_discharged', true)->first();
-    $bedCharges = 0;
-    $bedDays    = 0;
-    if ($bedAdmission) {
-        $bedDays    = $bedAdmission->total_days;
-        $bedCharges = $bedAdmission->bed_charges;
-    }
+    $bedCharges = $bedAdmission?->bed_charges ?? 0;
+    $bedDays    = $bedAdmission?->total_days ?? 0;
 
-    // GRAND TOTAL: Only unpaid items + one-time fees (only if no receipt yet)
     $hasReceipt = $visit->receipt()->exists();
 
     $grandTotal = 0;
 
-    // Only add registration + consultation if NO receipt yet
-    if (!$hasReceipt) {
+    // Always show reg + consult only if NO receipt
+    $showRegConsult = !$hasReceipt;
+
+    if ($showRegConsult) {
         $grandTotal += $regFee + $consultFee;
     }
 
-    // Add unpaid medicines
-    $grandTotal += $medicines->sum(function ($order) {
-        return ($order->quantity_issued ?? 1) * $order->medicine->price;
-    });
-
-    // Add unpaid lab tests
+    $grandTotal += $medicines->sum(fn($o) => ($o->quantity_issued ?? 1) * $o->medicine->price);
     $grandTotal += $labTests->sum(fn($t) => $t->test->price);
-
-    // Add injections
     $grandTotal += $injections->sum(fn($i) => $i->medicine->price);
-
-    // Add bed charges
     $grandTotal += $bedCharges;
 
-    $receiptGenerated = $hasReceipt;
+    // Button should be visible if there are ANY unpaid items
+    $hasUnpaidItems = $medicines->isNotEmpty() || $labTests->isNotEmpty() || $injections->isNotEmpty() || $bedCharges > 0;
 
-    // Sidebar data (keep your existing logic)
+    $showGenerateButton = $hasUnpaidItems;
+
+    // Sidebar data
     $pendingVisits = Visit::with(['patient', 'doctor'])
         ->where(function ($q) {
             $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
@@ -180,7 +168,8 @@ class BillingController extends Controller
         'bedCharges',
         'bedDays',
         'grandTotal',
-        'receiptGenerated',
+        'showRegConsult',
+        'showGenerateButton',
         'pendingVisits',
         'pendingCount',
         'inProgressVisits',

@@ -65,7 +65,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @if($regFee > 0)
+                               @if($showRegConsult && $regFee > 0)
                                 <tr>
                                     <td>Registration Fee</td>
                                     <td class="text-center">1</td>
@@ -74,7 +74,7 @@
                                 </tr>
                                 @endif
 
-                                @if($consultFee > 0)
+                                @if($showRegConsult && $consultFee > 0)
                                 <tr>
                                     <td>Doctor Consultation Fee</td>
                                     <td class="text-center">1</td>
