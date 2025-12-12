@@ -84,11 +84,15 @@
                                 @endif
 
                                 @foreach($medicines as $m)
+                                @php
+                                    $issuedQty = $m->pharmacyIssues->sum('quantity_issued') ?? 1;
+                                    $totalPrice = $issuedQty * $m->medicine->price;
+                                @endphp
                                 <tr>
                                     <td>{{ $m->medicine->medicine_name }}</td>
-                                    <td class="text-center">{{ $m->quantity_issued ?? 1 }}</td>
+                                    <td class="text-center">{{ $issuedQty }}</td>
                                     <td class="text-end">Tsh{{ number_format($m->medicine->price, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format(($m->quantity_issued ?? 1) * $m->medicine->price, 0) }}</td>
+                                    <td class="text-end">Tsh{{ number_format($totalPrice, 0) }}</td>
                                 </tr>
                                 @endforeach
 
@@ -133,9 +137,7 @@
                     <!-- Generate Receipt Button -->
   <div class="text-center mt-5">
     @if($showGenerateButton)
-        <button type="button" class="btn btn-primary btn-lg px-5 me-3" data-bs-toggle="modal" data-bs-target="#paymentModal">
-            Record Partial Payment
-        </button>
+        
         <form action="{{ route('billing.generate', $visit) }}" method="POST" class="d-inline">
             @csrf
             <button type="submit" class="btn btn-success btn-lg px-5 shadow">

@@ -88,4 +88,10 @@ class VisitMedicineOrder extends Model
             'handed_over_by' => $userId,
         ]);
     }
+
+
+    public function pharmacyIssues()
+    {
+        return $this->hasMany(PharmacyIssue::class, 'visit_medicine_order_id');
+    }
 }

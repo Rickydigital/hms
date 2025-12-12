@@ -94,44 +94,67 @@ class BillingController extends Controller
     $regFee     = Setting::get('registration_fee', 0);
     $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
 
+    // 1. Medicines: Only issued, and load pharmacy issues to get correct quantity
     $medicines = $visit->medicineOrders()
         ->where('is_issued', true)
-        ->with('medicine')
+        ->with(['medicine', 'pharmacyIssues']) // ← Critical: load issues for quantity
         ->get();
 
+    // 2. Lab Tests: Only UNPAID ones
     $labTests = $visit->labOrders()
         ->where('is_paid', false)
         ->with('test')
         ->get();
 
-    $injections = $visit->injectionOrders()->where('is_given', true)->get();
+    // 3. Injections (assuming no payment flag yet)
+    $injections = $visit->injectionOrders()
+        ->where('is_given', true)
+        ->with('medicine')
+        ->get();
 
+    // 4. Bed charges
     $bedAdmission = $visit->bedAdmission()->where('is_discharged', true)->first();
     $bedCharges = $bedAdmission?->bed_charges ?? 0;
     $bedDays    = $bedAdmission?->total_days ?? 0;
 
+    // Check if any receipt exists (for showing reg/consult once)
     $hasReceipt = $visit->receipt()->exists();
 
-    $grandTotal = 0;
-
-    // Always show reg + consult only if NO receipt
+    // Show registration & consultation only if no receipt yet
     $showRegConsult = !$hasReceipt;
+
+    // Calculate grand total
+    $grandTotal = 0;
 
     if ($showRegConsult) {
         $grandTotal += $regFee + $consultFee;
     }
 
-    $grandTotal += $medicines->sum(fn($o) => ($o->quantity_issued ?? 1) * $o->medicine->price);
+    // Medicines: Use actual issued quantity from pharmacy_issues table
+    $grandTotal += $medicines->sum(function ($order) {
+        $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
+        return $issuedQty * $order->medicine->price;
+    });
+
+    // Unpaid lab tests
     $grandTotal += $labTests->sum(fn($t) => $t->test->price);
+
+    // Injections
     $grandTotal += $injections->sum(fn($i) => $i->medicine->price);
+
+    // Bed charges
     $grandTotal += $bedCharges;
 
-    // Button should be visible if there are ANY unpaid items
-    $hasUnpaidItems = $medicines->isNotEmpty() || $labTests->isNotEmpty() || $injections->isNotEmpty() || $bedCharges > 0;
+    // Show generate button only if there are unpaid items
+    $hasUnpaidItems = $medicines->isNotEmpty() 
+        || $labTests->isNotEmpty() 
+        || $injections->isNotEmpty() 
+        || $bedCharges > 0 
+        || $showRegConsult; // reg/consult if not yet billed
 
-    $showGenerateButton = $hasUnpaidItems;
+    $showGenerateButton = $hasUnpaidItems && $grandTotal > 0;
 
-    // Sidebar data
+    // Sidebar data (unchanged)
     $pendingVisits = Visit::with(['patient', 'doctor'])
         ->where(function ($q) {
             $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
@@ -177,104 +200,39 @@ class BillingController extends Controller
     ));
 }
 
- public function generateReceipt(Request $request, Visit $visit)
-    {
-        Log::info("BillingController@generateReceipt - Attempting to generate receipt for visit ID: {$visit->id}");
+public function generateReceipt(Request $request, Visit $visit)
+{
+    Log::info("BillingController@generateReceipt - Generating receipt for visit ID: {$visit->id}");
 
-        $view = $this->calculateBill($visit);
-        $data = $view->getData();
+    $view = $this->calculateBill($visit);
+    $data = $view->getData();
 
-        Log::info("BillingController@generateReceipt - Grand Total: {$data['grandTotal']}");
-
-        if ($data['grandTotal'] <= 0) {
-            Log::warning("BillingController@generateReceipt - No amount to bill for visit {$visit->id}");
-            return back()->with('error', 'No pending amount to generate receipt.');
-        }
-
-        try {
-            // Generate receipt number
-            $year = now()->format('Y');
-            $count = Receipt::whereYear('generated_at', $year)->count() + 1;
-            $receiptNo = "RCPT{$year}-" . str_pad($count, 6, '0', STR_PAD_LEFT);
-
-            Log::info("BillingController@generateReceipt - Creating receipt #{$receiptNo}");
-
-            $receipt = Receipt::create([
-                'visit_id'     => $visit->id,
-                'receipt_no'   => $receiptNo,
-                'grand_total'  => $data['grandTotal'],
-                'generated_by' => Auth::id(),
-                'generated_at' => now(),
-            ]);
-
-            Log:: info("Receipt created ID: {$receipt->id}");
-
-            // Create payment record
-            $payment = Payment::create([
-                'visit_id'       => $visit->id,
-                'amount'         => $data['grandTotal'],
-                'type'           => 'bill_payment',
-                'payment_method' => 'cash',
-                'received_by'    => Auth::id(),
-                'paid_at'        => now(),
-            ]);
-
-            Log::info("BillingController@generateReceipt - Payment created ID: {$payment->id}");
-
-            // Save payment details
-            $details = [];
-
-            foreach ($data['medicines'] as $order) {
-                $qty = $order->quantity_issued ?? 1;
-                $price = $order->medicine->price;
-                $total = $qty * $price;
-
-                $details[] = [
-                    'item_type'   => 'medicine',
-                    'item_name'   => $order->medicine->medicine_name,
-                    'quantity'    => $qty,
-                    'unit_price'  => $price,
-                    'total_price' => $total,
-                ];
-
-                $order->update([
-                    'is_paid' => true,
-                    'paid_at' => now(),
-                    'paid_by' => Auth::id(),
-                ]);
-            }
-
-            foreach ($data['labTests'] as $test) {
-                $details[] = [
-                    'item_type'   => 'lab_test',
-                    'item_name'   => $test->test->test_name . ' (Lab Test)',
-                    'quantity'    => 1,
-                    'unit_price'  => $test->test->price,
-                    'total_price' => $test->test->price,
-                ];
-
-                $test->update([
-                    'is_paid' => true,
-                    'paid_at' => now(),
-                    'paid_by' => Auth::id(),
-                ]);
-            }
-
-            foreach ($details as $detail) {
-                PaymentDetail::create(array_merge($detail, ['payment_id' => $payment->id]));
-            }
-
-            Log::info("BillingController@generateReceipt - Receipt #{$receiptNo} and payment recorded successfully for visit {$visit->id}");
-
-            return back()->with('success', "Receipt {$receiptNo} generated and payment recorded successfully!");
-
-        } catch (\Exception $e) {
-            Log::error("BillingController@generateReceipt - ERROR for visit {$visit->id}: " . $e->getMessage());
-            Log::error($e->getTraceAsString());
-
-            return back()->with('error', 'Failed to generate receipt. Check logs.');
-        }
+    if ($data['grandTotal'] <= 0) {
+        return back()->with('error', 'No pending amount to generate receipt.');
     }
+
+    try {
+        $year = now()->format('Y');
+        $count = Receipt::whereYear('generated_at', $year)->count() + 1;
+        $receiptNo = "RCPT{$year}-" . str_pad($count, 6, '0', STR_PAD_LEFT);
+
+        $receipt = Receipt::create([
+            'visit_id'     => $visit->id,
+            'receipt_no'   => $receiptNo,
+            'grand_total'  => $data['grandTotal'],
+            'generated_by' => Auth::id(),
+            'generated_at' => now(),
+        ]);
+
+        Log::info("BillingController@generateReceipt - Receipt #{$receiptNo} created ID: {$receipt->id}");
+
+        return redirect()->route('billing.index')->with('success', "Receipt {$receiptNo} generated successfully! Patient must pay at counter.");
+
+    } catch (\Exception $e) {
+        Log::error("BillingController@generateReceipt - ERROR: " . $e->getMessage());
+        return back()->with('error', 'Failed to generate receipt.');
+    }
+}
 
     public function recordPayment(Request $request, Visit $visit)
     {
