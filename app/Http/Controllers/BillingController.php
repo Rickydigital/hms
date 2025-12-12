@@ -15,38 +15,49 @@ use Illuminate\Support\Facades\Auth;
 class BillingController extends Controller
 {
     public function index()
-    {
-        // Show ALL visits that have services (lab, medicine, injection) but no receipt yet
-        $pendingVisits = Visit::with(['patient', 'doctor'])
-            ->where(function ($q) {
-                $q->whereHas('labOrders')
-                  ->orWhereHas('medicineOrders')
-                  ->orWhereHas('injectionOrders')
-                  ->orWhereHas('bedAdmission');
+{
+    // PENDING BILLS: Visits with ANY unpaid services (lab or medicine)
+    $pendingVisits = Visit::with(['patient', 'doctor'])
+        ->where(function ($q) {
+            // Has lab orders that are not paid
+            $q->whereHas('labOrders', function ($sq) {
+                $sq->where('is_paid', false);
             })
-            ->whereDoesntHave('receipt')
-            ->latest('visit_date')
-            ->paginate(20);
+            // OR has medicine orders that are not issued OR not paid
+            ->orWhereHas('medicineOrders', function ($sq) {
+                $sq->where('is_issued', false)
+                   ->orWhere('is_paid', false);
+            })
+            // OR has unpaid injections (if you add payment flag later)
+            ->orWhereHas('injectionOrders')
+            ->orWhereHas('bedAdmission');
+        })
+        ->latest('visit_date')
+        ->paginate(20);
 
-        $inProgressVisits = Visit::with(['patient', 'doctor'])
-            ->where('all_services_completed', false)
-            ->orWhereNull('all_services_completed')
-            ->whereDoesntHave('receipt')
-            ->latest('visit_date')
-            ->get();
+    // IN PROGRESS: Visits with services but not fully completed/paid
+    $inProgressVisits = Visit::with(['patient', 'doctor'])
+        ->where(function ($q) {
+            $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
+              ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
+              ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
+              ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false));
+        })
+        ->latest('visit_date')
+        ->get();
 
-        $receipts = Receipt::with(['visit.patient', 'visit.payments'])
-            ->latest('generated_at')
-            ->get();
+    $receipts = Receipt::with(['visit.patient', 'visit.payments'])
+        ->latest('generated_at')
+        ->get();
 
-        $pendingCount = $pendingVisits->total();
+    $pendingCount = $pendingVisits->total();
 
-        return view('billing.index', compact(
-            'pendingVisits', 'pendingCount',
-            'inProgressVisits',
-            'receipts'
-        ));
-    }
+    return view('billing.index', compact(
+        'pendingVisits', 'pendingCount',
+        'inProgressVisits',
+        'receipts'
+    ));
+}
 
     public function search(Request $request)
     {
@@ -86,9 +97,10 @@ class BillingController extends Controller
         $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
 
         // Only issued medicines
-        $medicines = $visit->medicineIssues()
-            ->whereNotNull('pharmacy_issues.issued_at')
-            ->get();
+       $medicines = $visit->medicineOrders()
+        ->where('is_issued', true)
+        ->with('medicine')
+        ->get();
 
         // ALL lab tests ordered by doctor — appears immediately!
         $labTests = $visit->labOrders()->with('test')->get();
@@ -105,7 +117,9 @@ class BillingController extends Controller
         }
 
         $grandTotal = $regFee + $consultFee
-                    + $medicines->sum('total_amount')
+                    + $medicines->sum(function ($order) {
+                        return $order->quantity_issued * $order->medicine->price;
+                    })
                     + $labTests->sum(fn($t) => $t->test->price)
                     + $injections->sum(fn($i) => $i->medicine->price)
                     + $bedCharges;

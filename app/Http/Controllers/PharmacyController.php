@@ -129,6 +129,7 @@ class PharmacyController extends Controller
             'is_issued' => true,
             'issued_by' => Auth::id(),
             'issued_at' => now(),
+            'quantity_issued' => $qtyNeeded,
             // is_paid remains false
         ]);
 

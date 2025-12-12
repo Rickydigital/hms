@@ -50,9 +50,11 @@
                             @php
                                 $medicine = $order->medicine;
                                 $totalStock = $medicine->currentStock();
+                                $unitPrice = $medicine->price;
                                 $canIssue = !$order->is_issued && $totalStock >= 1;
                                 $isIssued = $order->is_issued;
                                 $isPaid = $order->is_paid;
+                                $issuedQty = $order->quantity_issued ?? 1;
                             @endphp
 
                             <div class="p-4 border-bottom hover-bg-light" style="transition: all 0.3s;">
@@ -92,38 +94,53 @@
                                         </div>
                                     </div>
 
-                                    <!-- Stock + Actions -->
+                                    <!-- Stock + Actions + Price Calculation -->
                                     <div class="col-lg-5 text-center">
                                         @if($canIssue)
-                                            <!-- 1. Not issued yet → Show Issue Form -->
+                                            <!-- 1. Not issued yet → Show Issue Form with Auto Price -->
                                             <div class="bg-light border border-success border-3 rounded-pill p-4 mb-4 shadow-sm">
                                                 <div class="text-success fw-bold mb-2">Available Stock</div>
                                                 <div class="display-5 fw-bold text-teal">{{ $totalStock }}</div>
                                             </div>
 
-                                            <form action="{{ route('pharmacy.issue', $order) }}" method="POST" class="mt-3">
+                                            <form action="{{ route('pharmacy.issue', $order) }}" method="POST" class="issue-form mt-3">
                                                 @csrf
-                                                <div class="row g-3 justify-content-center">
-                                                    <div class="col-5">
+                                                <div class="row g-3 justify-content-center align-items-end">
+                                                    <div class="col-4">
+                                                        <label class="form-label fw-bold text-success">Quantity</label>
                                                         <input type="number" name="quantity_issued" 
-                                                               class="form-control form-control-lg text-center fw-bold border-success"
-                                                               value="1" min="1" max="{{ $totalStock }}" required>
+                                                               class="form-control form-control-lg text-center fw-bold qty-input"
+                                                               value="{{ $issuedQty }}" min="1" max="{{ $totalStock }}" required>
                                                     </div>
-                                                    <div class="col-7">
+                                                    <div class="col-4">
+                                                        <label class="form-label fw-bold text-primary">Unit Price</label>
+                                                        <input type="text" class="form-control form-control-lg text-center fw-bold price-display" 
+                                                               value="{{ number_format($unitPrice, 0) }}" readonly>
+                                                    </div>
+                                                    <div class="col-4">
                                                         <button type="submit" class="btn btn-success btn-lg w-100 rounded-pill shadow">
                                                             Issue Medicine
                                                         </button>
                                                     </div>
                                                 </div>
+                                                <div class="mt-3 text-end">
+                                                    <h5 class="text-teal-700 fw-bold">
+                                                        Total: Tsh <span class="line-total">0</span>
+                                                    </h5>
+                                                </div>
                                             </form>
 
                                         @elseif($isIssued && !$isPaid)
-                                            <!-- 2. Issued but not paid → Waiting for payment -->
+                                            <!-- 2. Issued but not paid -->
                                             <div class="bg-warning bg-opacity-10 border border-warning border-3 rounded-pill p-4 shadow-sm mb-3">
                                                 <div class="text-warning fw-bold fs-5">
                                                     Medicine Issued
                                                 </div>
-                                                <div class="text-dark">Waiting for payment at billing...</div>
+                                                <div class="text-dark">
+                                                    Qty: {{ $order->quantity_issued }} × Tsh {{ number_format($unitPrice, 0) }}
+                                                    <br><strong>Total: Tsh {{ number_format($order->quantity_issued * $unitPrice, 0) }}</strong>
+                                                </div>
+                                                <div class="text-dark mt-2">Waiting for payment at billing...</div>
                                             </div>
                                             <button class="btn btn-secondary btn-lg w-100 rounded-pill" disabled>
                                                 Payment Required
@@ -135,7 +152,11 @@
                                                 <div class="text-success fw-bold fs-5">
                                                     Payment Received
                                                 </div>
-                                                <div class="text-dark">Ready for collection</div>
+                                                <div class="text-dark">
+                                                    Qty: {{ $order->quantity_issued }} × Tsh {{ number_format($unitPrice, 0) }}
+                                                    <br><strong>Total: Tsh {{ number_format($order->quantity_issued * $unitPrice, 0) }}</strong>
+                                                </div>
+                                                <div class="text-dark mt-2">Ready for collection</div>
                                             </div>
 
                                             <form action="{{ route('pharmacy.handover', $order) }}" method="POST" class="mt-3">
@@ -159,7 +180,7 @@
                 </div>
             </div>
 
-            <!-- RIGHT: TODAYS GIVEN TO PATIENTS -->
+            <!-- RIGHT: TODAYS GIVEN -->
             <div class="col-lg-4">
                 <div class="card border-0 shadow rounded-4 h-100">
                     <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
@@ -206,5 +227,27 @@
         transform: translateY(-2px);
         box-shadow: 0 8px 25px rgba(13,148,136,0.4);
     }
+    .text-teal { color: #0d9488 !important; }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.issue-form').forEach(form => {
+        const qtyInput = form.querySelector('.qty-input');
+        const priceDisplay = form.querySelector('.price-display');
+        const lineTotal = form.querySelector('.line-total');
+
+        const unitPrice = parseFloat(priceDisplay.value.replace(/,/g, '')) || 0;
+
+        function updateTotal() {
+            const qty = parseInt(qtyInput.value) || 0;
+            const total = qty * unitPrice;
+            lineTotal.textContent = total.toLocaleString('en-TZ');
+        }
+
+        qtyInput.addEventListener('input', updateTotal);
+        updateTotal(); // Initial calculation
+    });
+});
+</script>
 @endsection
