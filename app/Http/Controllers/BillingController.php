@@ -189,31 +189,31 @@ class BillingController extends Controller
 
     public function generateReceipt(Request $request, Visit $visit)
 {
-    // Only allow generating receipt ONCE (final bill)
-    if ($visit->receipt()->exists()) {
-        return back()->with('error', 'Official final receipt already generated!');
-    }
-
     $view = $this->calculateBill($visit);
     $data = $view->getData();
 
     if ($data['grandTotal'] <= 0) {
-        return back()->with('error', 'No pending amount to generate receipt for.');
+        return back()->with('error', 'No pending amount to generate receipt.');
     }
 
-    // Create FINAL receipt
-    Receipt::create([
+    // Generate a new receipt number
+    $year = now()->format('Y');
+    $count = Receipt::whereYear('generated_at', $year)->count() + 1;
+    $receiptNo = "RCPT{$year}-" . str_pad($count, 6, '0', STR_PAD_LEFT);
+
+    $receipt = Receipt::create([
         'visit_id'     => $visit->id,
+        'receipt_no'   => $receiptNo,
         'grand_total'  => $data['grandTotal'],
         'generated_by' => Auth::id(),
         'generated_at' => now(),
     ]);
 
-    // Record FULL payment for remaining amount
+    // Record payment
     $payment = Payment::create([
         'visit_id'       => $visit->id,
         'amount'         => $data['grandTotal'],
-        'type'           => 'final_payment',
+        'type'           => 'bill_payment',
         'payment_method' => 'cash',
         'received_by'    => Auth::id(),
         'paid_at'        => now(),
