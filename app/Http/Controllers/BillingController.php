@@ -16,17 +16,21 @@ class BillingController extends Controller
 {
     public function index()
     {
+        // Show ALL visits that have services (lab, medicine, injection) but no receipt yet
         $pendingVisits = Visit::with(['patient', 'doctor'])
-            ->where('all_services_completed', true)
+            ->where(function ($q) {
+                $q->whereHas('labOrders')
+                  ->orWhereHas('medicineOrders')
+                  ->orWhereHas('injectionOrders')
+                  ->orWhereHas('bedAdmission');
+            })
             ->whereDoesntHave('receipt')
             ->latest('visit_date')
             ->paginate(20);
 
         $inProgressVisits = Visit::with(['patient', 'doctor'])
-            ->where(function ($query) {
-                $query->where('all_services_completed', false)
-                      ->orWhereNull('all_services_completed');
-            })
+            ->where('all_services_completed', false)
+            ->orWhereNull('all_services_completed')
             ->whereDoesntHave('receipt')
             ->latest('visit_date')
             ->get();
@@ -75,19 +79,18 @@ class BillingController extends Controller
 
     private function calculateBill($visit)
     {
-        if (!$visit->all_services_completed) {
-            abort(403, 'Services not completed yet. Cannot generate bill.');
-        }
+        // REMOVED THIS LINE — IT WAS BLOCKING LAB TESTS!
+        // if (!$visit->all_services_completed) { abort(403); }
 
         $regFee     = Setting::get('registration_fee', 0);
         $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
 
-        // Only issued medicines (pharmacy has already given)
+        // Only issued medicines
         $medicines = $visit->medicineIssues()
             ->whereNotNull('pharmacy_issues.issued_at')
             ->get();
 
-        // ALL lab tests ordered by doctor (appears immediately!)
+        // ALL lab tests ordered by doctor — appears immediately!
         $labTests = $visit->labOrders()->with('test')->get();
 
         // Only given injections
@@ -103,27 +106,27 @@ class BillingController extends Controller
 
         $grandTotal = $regFee + $consultFee
                     + $medicines->sum('total_amount')
-                    + $labTests->sum(fn($t) => $t->test->price)   // All ordered lab tests
+                    + $labTests->sum(fn($t) => $t->test->price)
                     + $injections->sum(fn($i) => $i->medicine->price)
                     + $bedCharges;
 
         $receiptGenerated = $visit->receipt()->exists();
 
-        // Re-fetch for sidebar
         $pendingVisits = Visit::with(['patient', 'doctor'])
-            ->where('all_services_completed', true)
+            ->where(function ($q) {
+                $q->whereHas('labOrders')
+                  ->orWhereHas('medicineOrders')
+                  ->orWhereHas('injectionOrders')
+                  ->orWhereHas('bedAdmission');
+            })
             ->whereDoesntHave('receipt')
             ->latest('visit_date')
             ->paginate(20);
 
         $pendingCount = $pendingVisits->total();
 
-        $inProgressVisits = Visit::with(['patient', 'doctor', 'medicineIssues', 'labOrders', 'injectionOrders', 'bedAdmission'])
+        $inProgressVisits = Visit::with(['patient', 'doctor'])
             ->where('all_services_completed', false)
-            ->orWhere(function ($q) {
-                $q->where('all_services_completed', true)
-                  ->whereHas('receipt');
-            })
             ->latest('visit_date')
             ->get();
 
@@ -189,92 +192,38 @@ class BillingController extends Controller
 
         $details = [];
 
-        // 1. Registration Fee
         if ($data['regFee'] > 0) {
-            $details[] = [
-                'item_type'   => 'registration',
-                'item_name'   => 'Registration Fee',
-                'quantity'    => 1,
-                'unit_price'  => $data['regFee'],
-                'total_price' => $data['regFee'],
-            ];
+            $details[] = ['item_type' => 'registration', 'item_name' => 'Registration Fee', 'quantity' => 1, 'unit_price' => $data['regFee'], 'total_price' => $data['regFee']];
         }
 
-        // 2. Consultation Fee
         if ($data['consultFee'] > 0) {
-            $details[] = [
-                'item_type'   => 'consultation',
-                'item_name'   => 'Doctor Consultation - Dr. ' . ($visit->doctor->name ?? 'Unknown'),
-                'quantity'    => 1,
-                'unit_price'  => $data['consultFee'],
-                'total_price' => $data['consultFee'],
-            ];
+            $details[] = ['item_type' => 'consultation', 'item_name' => 'Doctor Consultation - Dr. ' . ($visit->doctor->name ?? 'Unknown'), 'quantity' => 1, 'unit_price' => $data['consultFee'], 'total_price' => $data['consultFee']];
         }
 
-        // 3. Medicines – Only issued ones
         foreach ($data['medicines'] as $item) {
-            $details[] = [
-                'item_type'   => 'medicine',
-                'item_name'   => $item->medicine->medicine_name,
-                'quantity'    => $item->quantity_issued,
-                'unit_price'  => $item->unit_price,
-                'total_price' => $item->total_amount,
-            ];
+            $details[] = ['item_type' => 'medicine', 'item_name' => $item->medicine->medicine_name, 'quantity' => $item->quantity_issued, 'unit_price' => $item->unit_price, 'total_price' => $item->total_amount];
 
             VisitMedicineOrder::where('visit_id', $visit->id)
                 ->where('medicine_id', $item->medicine->id)
-                ->update([
-                    'is_paid' => true,
-                    'paid_at' => now(),
-                    'paid_by' => Auth::id(),
-                ]);
+                ->update(['is_paid' => true, 'paid_at' => now(), 'paid_by' => Auth::id()]);
         }
 
-        // 4. Lab Tests – ALL ordered tests (not just completed!)
         foreach ($data['labTests'] as $test) {
-            $details[] = [
-                'item_type'   => 'lab_test',
-                'item_name'   => $test->test->test_name . ' (Lab Test)',
-                'quantity'    => 1,
-                'unit_price'  => $test->test->price,
-                'total_price' => $test->test->price,
-            ];
+            $details[] = ['item_type' => 'lab_test', 'item_name' => $test->test->test_name . ' (Lab Test)', 'quantity' => 1, 'unit_price' => $test->test->price, 'total_price' => $test->test->price];
 
-            // Mark as paid when payment is recorded
-            $test->update([
-                'is_paid' => true,
-                'paid_at' => now(),
-                'paid_by' => Auth::id(),
-            ]);
+            $test->update(['is_paid' => true, 'paid_at' => now(), 'paid_by' => Auth::id()]);
         }
 
-        // 5. Injections
         foreach ($data['injections'] as $inj) {
-            $details[] = [
-                'item_type'   => 'injection',
-                'item_name'   => $inj->medicine->medicine_name . ' (Injection)',
-                'quantity'    => 1,
-                'unit_price'  => $inj->medicine->price,
-                'total_price' => $inj->medicine->price,
-            ];
+            $details[] = ['item_type' => 'injection', 'item_name' => $inj->medicine->medicine_name . ' (Injection)', 'quantity' => 1, 'unit_price' => $inj->medicine->price, 'total_price' => $inj->medicine->price];
         }
 
-        // 6. Bed Charges
         if ($data['bedCharges'] > 0) {
-            $details[] = [
-                'item_type'   => 'bed_charges',
-                'item_name'   => 'Bed/Ward Charges (' . $data['bedDays'] . ' days)',
-                'quantity'    => 1,
-                'unit_price'  => $data['bedCharges'],
-                'total_price' => $data['bedCharges'],
-            ];
+            $details[] = ['item_type' => 'bed_charges', 'item_name' => 'Bed/Ward Charges (' . $data['bedDays'] . ' days)', 'quantity' => 1, 'unit_price' => $data['bedCharges'], 'total_price' => $data['bedCharges']];
         }
 
-        // Save payment details
         foreach ($details as $detail) {
-            PaymentDetail::create(array_merge($detail, [
-                'payment_id' => $payment->id
-            ]));
+            PaymentDetail::create(array_merge($detail, ['payment_id' => $payment->id]));
         }
 
         return back()->with('success', "Payment of Tsh " . number_format($request->amount, 0) . " recorded successfully!");
@@ -295,19 +244,13 @@ class BillingController extends Controller
                 'amount'      => (int) $payment->amount,
                 'method'      => ucfirst($payment->payment_method),
                 'received_by' => $payment->receivedBy?->name ?? 'Unknown',
-                'details'     => $payment->details->map(function ($detail) {
-                    $unitPrice  = (float) $detail->unit_price;
-                    $totalPrice = (float) $detail->total_price;
-                    $quantity   = (int) $detail->quantity;
-
-                    return [
-                        'item_name'   => $detail->item_name,
-                        'quantity'    => $quantity,
-                        'unit_price'  => number_format($unitPrice, 0),
-                        'total_price' => number_format($totalPrice, 0),
-                        'line_total'  => number_format($quantity * $unitPrice, 0),
-                    ];
-                })->toArray()
+                'details'     => $payment->details->map(fn($d) => [
+                    'item_name'   => $d->item_name,
+                    'quantity'    => (int) $d->quantity,
+                    'unit_price'  => number_format((float) $d->unit_price, 0),
+                    'total_price' => number_format((float) $d->total_price, 0),
+                    'line_total'  => number_format((int) $d->quantity * (float) $d->unit_price, 0),
+                ])->toArray()
             ];
         })->toArray();
 
