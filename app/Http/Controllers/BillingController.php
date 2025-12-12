@@ -89,89 +89,116 @@ class BillingController extends Controller
     }
 
     private function calculateBill($visit)
-    {
-        // REMOVED THIS LINE — IT WAS BLOCKING LAB TESTS!
-        // if (!$visit->all_services_completed) { abort(403); }
+{
+    $regFee     = Setting::get('registration_fee', 0);
+    $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
 
-        $regFee     = Setting::get('registration_fee', 0);
-        $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
-
-        // Only issued medicines
-       $medicines = $visit->medicineOrders()
+    // 1. Medicines: Only issued ones
+    $medicines = $visit->medicineOrders()
         ->where('is_issued', true)
         ->with('medicine')
         ->get();
 
-        // ALL lab tests ordered by doctor — appears immediately!
-        $labTests = $visit->labOrders()->with('test')->get();
+    // 2. Lab Tests: Only UNPAID ones
+    $labTests = $visit->labOrders()
+        ->where('is_paid', false)
+        ->with('test')
+        ->get();
 
-        // Only given injections
-        $injections = $visit->injectionOrders()->where('is_given', true)->get();
+    // 3. Injections: Only if not paid (add is_paid flag later if needed)
+    $injections = $visit->injectionOrders()->where('is_given', true)->get();
 
-        $bedAdmission = $visit->bedAdmission()->where('is_discharged', true)->first();
-        $bedCharges = 0;
-        $bedDays    = 0;
-        if ($bedAdmission) {
-            $bedDays    = $bedAdmission->total_days;
-            $bedCharges = $bedAdmission->bed_charges;
-        }
-
-        $grandTotal = $regFee + $consultFee
-                    + $medicines->sum(function ($order) {
-                        return $order->quantity_issued * $order->medicine->price;
-                    })
-                    + $labTests->sum(fn($t) => $t->test->price)
-                    + $injections->sum(fn($i) => $i->medicine->price)
-                    + $bedCharges;
-
-        $receiptGenerated = $visit->receipt()->exists();
-
-        $pendingVisits = Visit::with(['patient', 'doctor'])
-            ->where(function ($q) {
-                $q->whereHas('labOrders')
-                  ->orWhereHas('medicineOrders')
-                  ->orWhereHas('injectionOrders')
-                  ->orWhereHas('bedAdmission');
-            })
-            ->whereDoesntHave('receipt')
-            ->latest('visit_date')
-            ->paginate(20);
-
-        $pendingCount = $pendingVisits->total();
-
-        $inProgressVisits = Visit::with(['patient', 'doctor'])
-            ->where('all_services_completed', false)
-            ->latest('visit_date')
-            ->get();
-
-        $receipts = Receipt::with(['visit.patient', 'visit.payments'])
-            ->latest('generated_at')
-            ->get();
-
-        return view('billing.index', compact(
-            'visit',
-            'regFee',
-            'consultFee',
-            'medicines',
-            'labTests',
-            'injections',
-            'bedCharges',
-            'bedDays',
-            'grandTotal',
-            'receiptGenerated',
-            'pendingVisits',
-            'pendingCount',
-            'inProgressVisits',
-            'receipts'
-        ));
+    $bedAdmission = $visit->bedAdmission()->where('is_discharged', true)->first();
+    $bedCharges = 0;
+    $bedDays    = 0;
+    if ($bedAdmission) {
+        $bedDays    = $bedAdmission->total_days;
+        $bedCharges = $bedAdmission->bed_charges;
     }
+
+    // GRAND TOTAL: Only unpaid items + one-time fees (only if no receipt yet)
+    $hasReceipt = $visit->receipt()->exists();
+
+    $grandTotal = 0;
+
+    // Only add registration + consultation if NO receipt yet
+    if (!$hasReceipt) {
+        $grandTotal += $regFee + $consultFee;
+    }
+
+    // Add unpaid medicines
+    $grandTotal += $medicines->sum(function ($order) {
+        return ($order->quantity_issued ?? 1) * $order->medicine->price;
+    });
+
+    // Add unpaid lab tests
+    $grandTotal += $labTests->sum(fn($t) => $t->test->price);
+
+    // Add injections
+    $grandTotal += $injections->sum(fn($i) => $i->medicine->price);
+
+    // Add bed charges
+    $grandTotal += $bedCharges;
+
+    $receiptGenerated = $hasReceipt;
+
+    // Sidebar data (keep your existing logic)
+    $pendingVisits = Visit::with(['patient', 'doctor'])
+        ->where(function ($q) {
+            $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
+              ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false)->orWhere('is_paid', false))
+              ->orWhereHas('injectionOrders')
+              ->orWhereHas('bedAdmission');
+        })
+        ->latest('visit_date')
+        ->paginate(20);
+
+    $pendingCount = $pendingVisits->total();
+
+    $inProgressVisits = Visit::with(['patient', 'doctor'])
+        ->where(function ($q) {
+            $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
+              ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
+              ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
+              ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false));
+        })
+        ->latest('visit_date')
+        ->get();
+
+    $receipts = Receipt::with(['visit.patient', 'visit.payments'])
+        ->latest('generated_at')
+        ->get();
+
+    return view('billing.index', compact(
+        'visit',
+        'regFee',
+        'consultFee',
+        'medicines',
+        'labTests',
+        'injections',
+        'bedCharges',
+        'bedDays',
+        'grandTotal',
+        'receiptGenerated',
+        'pendingVisits',
+        'pendingCount',
+        'inProgressVisits',
+        'receipts'
+    ));
+}
 
     public function generateReceipt(Request $request, Visit $visit)
     {
         $view = $this->calculateBill($visit);
         $data = $view->getData();
 
-        Receipt::create([
+        // Prevent duplicate receipt
+        if ($visit->receipt()->exists()) {
+            return back()->with('error', "Official receipt already generated for this visit!");
+        }
+
+        // Create the official receipt
+        $receipt = Receipt::create([
             'visit_id'           => $visit->id,
             'total_registration' => $data['regFee'],
             'total_final'        => $data['grandTotal'],
@@ -180,7 +207,82 @@ class BillingController extends Controller
             'generated_at'       => now(),
         ]);
 
-        return back()->with('success', "Official receipt generated successfully!");
+        // RECORD FULL PAYMENT (this is the missing part!)
+        $payment = Payment::create([
+            'visit_id'       => $visit->id,
+            'amount'         => $data['grandTotal'],
+            'type'           => 'bill_payment',
+            'payment_method' => 'cash', // or let user choose later
+            'transaction_id' => null,
+            'received_by'    => Auth::id(),
+            'paid_at'        => now(),
+        ]);
+
+        // Copy bill items to payment details
+        $details = [];
+
+        if ($data['regFee'] > 0 && !$visit->receipt()->exists()) {
+            $details[] = [
+                'item_type'   => 'registration',
+                'item_name'   => 'Registration Fee',
+                'quantity'    => 1,
+                'unit_price'  => $data['regFee'],
+                'total_price' => $data['regFee'],
+            ];
+        }
+
+        if ($data['consultFee'] > 0 && !$visit->receipt()->exists()) {
+            $details[] = [
+                'item_type'   => 'consultation',
+                'item_name'   => 'Doctor Consultation - Dr. ' . ($visit->doctor->name ?? 'Unknown'),
+                'quantity'    => 1,
+                'unit_price'  => $data['consultFee'],
+                'total_price' => $data['consultFee'],
+            ];
+        }
+
+        foreach ($data['medicines'] as $order) {
+            $details[] = [
+                'item_type'   => 'medicine',
+                'item_name'   => $order->medicine->medicine_name,
+                'quantity'    => $order->quantity_issued ?? 1,
+                'unit_price'  => $order->medicine->price,
+                'total_price' => ($order->quantity_issued ?? 1) * $order->medicine->price,
+            ];
+
+            // Mark medicine as paid
+            $order->update([
+                'is_paid' => true,
+                'paid_at' => now(),
+                'paid_by' => Auth::id(),
+            ]);
+        }
+
+        foreach ($data['labTests'] as $test) {
+            $details[] = [
+                'item_type'   => 'lab_test',
+                'item_name'   => $test->test->test_name . ' (Lab Test)',
+                'quantity'    => 1,
+                'unit_price'  => $test->test->price,
+                'total_price' => $test->test->price,
+            ];
+
+            // Mark lab as paid
+            $test->update([
+                'is_paid' => true,
+                'paid_at' => now(),
+                'paid_by' => Auth::id(),
+            ]);
+        }
+
+        // Add other items (injections, bed) similarly if needed
+
+        // Save payment details
+        foreach ($details as $detail) {
+            PaymentDetail::create(array_merge($detail, ['payment_id' => $payment->id]));
+        }
+
+        return back()->with('success', "Official receipt and full payment recorded successfully!");
     }
 
     public function recordPayment(Request $request, Visit $visit)

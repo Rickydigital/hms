@@ -86,9 +86,9 @@
                                 @foreach($medicines as $m)
                                 <tr>
                                     <td>{{ $m->medicine->medicine_name }}</td>
-                                    <td class="text-center">{{ $m->quantity_issued }}</td>
-                                    <td class="text-end">Tsh{{ number_format($m->unit_price, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format($m->total_amount, 0) }}</td>
+                                    <td class="text-center">{{ $m->quantity_issued ?? 1 }}</td>
+                                    <td class="text-end">Tsh{{ number_format($m->medicine->price, 0) }}</td>
+                                    <td class="text-end">Tsh{{ number_format(($m->quantity_issued ?? 1) * $m->medicine->price, 0) }}</td>
                                 </tr>
                                 @endforeach
 
