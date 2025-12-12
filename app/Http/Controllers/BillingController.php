@@ -15,48 +15,46 @@ use Illuminate\Support\Facades\Log;
 
 class BillingController extends Controller
 {
-   public function index()
+    public function index()
 {
-    // 1. PENDING BILLS: Unpaid items AND NO receipt yet
+    // PENDING BILLS: Visits with ANY unpaid services (lab or medicine)
     $pendingVisits = Visit::with(['patient', 'doctor'])
-        ->whereDoesntHave('receipt') // ← Critical: No receipt generated
         ->where(function ($q) {
-            // Unpaid lab tests
-            $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
-              // Unissued or unpaid medicines
-              ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false)->orWhere('is_paid', false))
-              // Pending injections or bed
-              ->orWhereHas('injectionOrders')
-              ->orWhereHas('bedAdmission');
+            // Has lab orders that are not paid
+            $q->whereHas('labOrders', function ($sq) {
+                $sq->where('is_paid', false);
+            })
+            // OR has medicine orders that are not issued OR not paid
+            ->orWhereHas('medicineOrders', function ($sq) {
+                $sq->where('is_issued', false)
+                   ->orWhere('is_paid', false);
+            })
+            // OR has unpaid injections (if you add payment flag later)
+            ->orWhereHas('injectionOrders')
+            ->orWhereHas('bedAdmission');
         })
         ->latest('visit_date')
         ->paginate(20);
 
-    $pendingCount = $pendingVisits->total();
-
-    // 2. AWAITING PAYMENT: Receipt generated BUT no payment recorded
-    $inProgressVisits = Visit::with(['patient', 'doctor', 'receipt'])
-        ->whereHas('receipt') // Receipt exists
-        ->whereDoesntHave('payments') // No payment recorded yet
-        ->orWhere(function ($q) {
-            // OR receipt exists but still has unpaid items (partial payment case)
-            $q->whereHas('receipt')
-              ->where(function ($sq) {
-                  $sq->whereHas('labOrders', fn($ssq) => $ssq->where('is_paid', false))
-                     ->orWhereHas('medicineOrders', fn($ssq) => $ssq->where('is_paid', false));
-              });
+    // IN PROGRESS: Visits with services but not fully completed/paid
+    $inProgressVisits = Visit::with(['patient', 'doctor'])
+        ->where(function ($q) {
+            $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
+              ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
+              ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
+              ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false));
         })
         ->latest('visit_date')
         ->get();
 
-    // 3. RECEIPT HISTORY: All receipts
-    $receipts = Receipt::with(['visit.patient', 'visit.payments.receivedBy'])
+    $receipts = Receipt::with(['visit.patient', 'visit.payments'])
         ->latest('generated_at')
         ->get();
 
+    $pendingCount = $pendingVisits->total();
+
     return view('billing.index', compact(
-        'pendingVisits',
-        'pendingCount',
+        'pendingVisits', 'pendingCount',
         'inProgressVisits',
         'receipts'
     ));
