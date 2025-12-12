@@ -15,13 +15,18 @@ class VisitLabOrder extends Model
         'extra_instruction',
         'is_completed',
         'completed_at',
+        'is_paid',        
+        'paid_at',       
+        'paid_by',        
     ];
 
     protected function casts(): array
     {
         return [
             'is_completed' => 'boolean',
+            'is_paid'      => 'boolean',
             'completed_at' => 'datetime',
+            'paid_at'      => 'datetime',
         ];
     }
 
@@ -38,6 +43,21 @@ class VisitLabOrder extends Model
     public function result()
     {
         return $this->hasOne(LabResult::class, 'visit_lab_order_id');
+    }
+
+    public function paidBy()
+    {
+        return $this->belongsTo(User::class, 'paid_by');
+    }
+
+    // Helper methods
+    public function markAsPaid($userId)
+    {
+        $this->update([
+            'is_paid' => true,
+            'paid_at' => now(),
+            'paid_by' => $userId,
+        ]);
     }
 
     public function complete()

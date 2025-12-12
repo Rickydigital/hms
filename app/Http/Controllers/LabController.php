@@ -23,10 +23,10 @@ class LabController extends Controller
 
     public function index(Request $request)
     {
-        // Search Patient History
         $search = $request->get('search');
         $history = collect();
 
+        // Search Patient Lab History (shows both paid & unpaid)
         if ($search) {
             $patients = Patient::where('patient_id', 'like', "%$search%")
                 ->orWhere('name', 'like', "%$search%")
@@ -49,12 +49,14 @@ class LabController extends Controller
             }
         }
 
-        // Pending + Today's Completed
+        // PENDING TESTS: ONLY PAID + NOT COMPLETED
         $pending = VisitLabOrder::with(['visit.patient', 'test'])
             ->where('is_completed', false)
+            ->where('is_paid', true)  // ONLY PAID TESTS
             ->latest()
             ->get();
 
+        // TODAY'S COMPLETED (paid or not — just for reference)
         $completedToday = VisitLabOrder::with(['visit.patient', 'test', 'result'])
             ->where('is_completed', true)
             ->whereDate('completed_at', today())
@@ -68,13 +70,26 @@ class LabController extends Controller
     public function show(VisitLabOrder $order)
     {
         $order->load(['visit.patient', 'test', 'result']);
+
+        // BLOCK ACCESS IF NOT PAID
+        if (!$order->is_paid) {
+            return redirect()->route('lab.index')
+                ->with('error', "This lab test is NOT PAID yet. Patient must pay at billing first before results can be entered.");
+        }
+
         return view('lab.show', compact('order'));
     }
 
     public function storeResult(Request $request, VisitLabOrder $order)
     {
+        // Double security check
         if (!Auth::user()->can('enter lab results')) {
             abort(403);
+        }
+
+        // BLOCK IF NOT PAID
+        if (!$order->is_paid) {
+            return back()->withErrors('This lab test is not paid. Payment required before entering results.');
         }
 
         $request->validate([
@@ -108,6 +123,13 @@ class LabController extends Controller
             ]
         );
 
-        return redirect()->route('lab.index')->with('success', 'Lab result saved successfully!');
+        // Mark as completed
+        $order->update([
+            'is_completed' => true,
+            'completed_at' => now(),
+        ]);
+
+        return redirect()->route('lab.index')
+            ->with('success', "Result for {$order->test->test_name} saved successfully!");
     }
 }

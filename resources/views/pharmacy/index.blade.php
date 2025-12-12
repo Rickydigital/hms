@@ -4,13 +4,13 @@
 @section('content')
 <div class="min-vh-100 bg-light">
 
-    <!-- HEADER – PURE TEAL THEME (Bootstrap) -->
-    <div class="bg-gradient text-white py-5 shadow" style="background: linear-gradient(90deg, #F5F7F6FF, #F7FAFAFF);">
+    <!-- HEADER -->
+    <div class="bg-gradient text-white py-5 shadow" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
         <div class="container-fluid px-4 px-lg-5">
             <div class="row align-items-center py-3">
                 <div class="col">
                     <h1 class="display-5 fw-bold mb-1">
-                        <i class="bi bi-prescription2 me-3"></i> Pharmacy Module
+                        Pharmacy Module
                     </h1>
                     <p class="lead mb-0 opacity-75">
                         Welcome, <strong>{{ Auth::user()->name }}</strong> 
@@ -19,17 +19,14 @@
                 </div>
                 <div class="col-auto text-end">
                     <div class="mb-3">
-                        <span class="me-2 opacity-75">Pending Prescriptions:</span>
+                        <span class="me-2 opacity-75">Pending:</span>
                         <span class="badge bg-warning text-dark fs-4 px-4 py-2">{{ $pending->count() }}</span>
                     </div>
                     <a href="{{ route('pharmacy.history') }}" class="btn btn-light btn-lg shadow-sm">
-                        <i class="bi bi-clock-history me-2"></i>
-                        <strong>View Past Issues</strong>
+                        View Past Issues
                     </a>
-
                     <a href="{{ route('pharmacy.sales.history') }}" class="btn btn-success btn-lg shadow-lg ms-3">
-                        <i class="bi bi-cart-plus me-2"></i>
-                        <strong>Direct Sale (OTC)</strong>
+                        Direct Sale (OTC)
                     </a>
                 </div>
             </div>
@@ -39,64 +36,69 @@
     <div class="container-fluid py-5">
         <div class="row g-5">
 
-            <!-- PENDING MEDICINES -->
+            <!-- MAIN: PENDING + READY FOR COLLECTION -->
             <div class="col-lg-8">
                 <div class="card border-0 shadow rounded-4 overflow-hidden h-100">
                     <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
                         <h4 class="mb-0 fw-bold">
-                            <i class="bi bi-prescription2 me-3"></i>
-                            Pending Medicines to Issue
+                            Medicines Workflow
                         </h4>
                     </div>
 
                     <div class="card-body p-0" style="max-height: 78vh; overflow-y: auto;">
-                        @forelse($pending as $order)
+                        @forelse($pending->merge($readyForCollection) as $order)
                             @php
                                 $medicine = $order->medicine;
                                 $totalStock = $medicine->currentStock();
-                                $canIssue = $totalStock >= 1;
+                                $canIssue = !$order->is_issued && $totalStock >= 1;
+                                $isIssued = $order->is_issued;
+                                $isPaid = $order->is_paid;
                             @endphp
 
-                            <div class="p-4 border-bottom hover-bg-light" style="transition: background 0.3s;">
+                            <div class="p-4 border-bottom hover-bg-light" style="transition: all 0.3s;">
                                 <div class="row align-items-center">
 
                                     <!-- Medicine & Patient Info -->
-                                    <div class="col-lg-8">
-                                        <h5 class="fw-bold text-dark mb-3">
-                                            {{ $medicine->medicine_name }}
-                                            @if($medicine->price > 0)
-                                                <span class="text-success fw-normal">
-                                                    • {{ number_format($medicine->price) }}/= TSh
-                                                </span>
-                                            @endif
-                                        </h5>
+                                    <div class="col-lg-7">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <h5 class="fw-bold text-dark mb-0">
+                                                {{ $medicine->medicine_name }}
+                                                @if($medicine->generic_name)
+                                                    <small class="text-muted">• {{ $medicine->generic_name }}</small>
+                                                @endif
+                                            </h5>
+                                            <div>
+                                                @if($isPaid)
+                                                    <span class="badge bg-success fs-6">PAID</span>
+                                                @elseif($isIssued)
+                                                    <span class="badge bg-warning text-dark fs-6">ISSUED (NOT PAID)</span>
+                                                @else
+                                                    <span class="badge bg-info text-white fs-6">PRESCRIBED</span>
+                                                @endif
+                                            </div>
+                                        </div>
 
                                         <div class="text-muted small">
                                             <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-person-fill text-success me-3"></i>
-                                                <div>
-                                                    <strong>Patient:</strong> {{ $order->visit->patient->name }}
-                                                    <span class="text-secondary ms-2">({{ $order->visit->patient->patient_id }})</span>
-                                                </div>
+                                                Patient: <strong>{{ $order->visit->patient->name }}</strong>
+                                                <span class="text-secondary ms-2">({{ $order->visit->patient->patient_id }})</span>
                                             </div>
                                             <div class="d-flex align-items-center">
-                                                <i class="bi bi-calendar-check text-success me-3"></i>
-                                                <div>
-                                                    <strong>Dosage:</strong> {{ $order->dosage }} × {{ $order->duration_days }} days
-                                                    @if($order->instruction)
-                                                        <span class="text-success ms-2">• {{ $order->instruction }}</span>
-                                                    @endif
-                                                </div>
+                                                Dosage: <strong>{{ $order->dosage }}</strong> × {{ $order->duration_days }} days
+                                                @if($order->instruction)
+                                                    <span class="text-success ms-2">• {{ $order->instruction }}</span>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Stock + Issue Button -->
-                                    <div class="col-lg-4 text-center">
+                                    <!-- Stock + Actions -->
+                                    <div class="col-lg-5 text-center">
                                         @if($canIssue)
+                                            <!-- 1. Not issued yet → Show Issue Form -->
                                             <div class="bg-light border border-success border-3 rounded-pill p-4 mb-4 shadow-sm">
                                                 <div class="text-success fw-bold mb-2">Available Stock</div>
-                                                <div class="display-5 fw-bold text-teal" style="color:#0d9488">{{ $totalStock }}</div>
+                                                <div class="display-5 fw-bold text-teal">{{ $totalStock }}</div>
                                             </div>
 
                                             <form action="{{ route('pharmacy.issue', $order) }}" method="POST" class="mt-3">
@@ -109,17 +111,39 @@
                                                     </div>
                                                     <div class="col-7">
                                                         <button type="submit" class="btn btn-success btn-lg w-100 rounded-pill shadow">
-                                                            <i class="bi bi-check-circle-fill me-2"></i>
                                                             Issue Medicine
                                                         </button>
                                                     </div>
                                                 </div>
                                             </form>
-                                        @else
-                                            <div class="bg-danger bg-opacity-10 border border-danger border-3 rounded-pill p-4 shadow-sm">
-                                                <div class="text-danger fw-bold fs-4 mb-2">OUT OF STOCK</div>
-                                                <div class="text-danger">Only {{ $totalStock }} left</div>
+
+                                        @elseif($isIssued && !$isPaid)
+                                            <!-- 2. Issued but not paid → Waiting for payment -->
+                                            <div class="bg-warning bg-opacity-10 border border-warning border-3 rounded-pill p-4 shadow-sm mb-3">
+                                                <div class="text-warning fw-bold fs-5">
+                                                    Medicine Issued
+                                                </div>
+                                                <div class="text-dark">Waiting for payment at billing...</div>
                                             </div>
+                                            <button class="btn btn-secondary btn-lg w-100 rounded-pill" disabled>
+                                                Payment Required
+                                            </button>
+
+                                        @elseif($isIssued && $isPaid)
+                                            <!-- 3. Issued + Paid → Final Handover -->
+                                            <div class="bg-success bg-opacity-10 border border-success border-3 rounded-pill p-4 shadow-sm mb-3">
+                                                <div class="text-success fw-bold fs-5">
+                                                    Payment Received
+                                                </div>
+                                                <div class="text-dark">Ready for collection</div>
+                                            </div>
+
+                                            <form action="{{ route('pharmacy.handover', $order) }}" method="POST" class="mt-3">
+                                                @csrf
+                                                <button type="submit" class="btn btn-success btn-lg w-100 rounded-pill shadow-lg">
+                                                    Give Medicine to Patient
+                                                </button>
+                                            </form>
                                         @endif
                                     </div>
                                 </div>
@@ -128,40 +152,39 @@
                             <div class="text-center py-5">
                                 <i class="bi bi-check-circle-fill text-success display-1 mb-4"></i>
                                 <h3 class="text-success fw-bold">All Clear!</h3>
-                                <p class="text-muted fs-5">No pending prescriptions. Great job!</p>
+                                <p class="text-muted fs-5">No pending prescriptions.</p>
                             </div>
                         @endforelse
                     </div>
                 </div>
             </div>
 
-            <!-- TODAYS ISSUED -->
+            <!-- RIGHT: TODAYS GIVEN TO PATIENTS -->
             <div class="col-lg-4">
                 <div class="card border-0 shadow rounded-4 h-100">
                     <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
                         <h5 class="mb-0 fw-bold">
-                            <i class="bi bi-check2-all me-3"></i>
-                            Issued Today 
-                            <span class="badge bg-light text-success ms-3">{{ $issuedToday->count() }}</span>
+                            Given to Patients Today 
+                            <span class="badge bg-light text-success ms-3">{{ $givenToday->count() }}</span>
                         </h5>
                     </div>
                     <div class="card-body p-0" style="max-height: 78vh; overflow-y: auto;">
-                        @forelse($issuedToday as $order)
+                        @forelse($givenToday as $order)
                             <div class="p-4 border-bottom hover-bg-light">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <div class="fw-bold text-success">{{ $order->medicine->medicine_name }}</div>
                                         <small class="text-muted">
-                                            {{ $order->visit->patient->name }} • {{ $order->issued_at->format('h:i A') }}
+                                            {{ $order->visit->patient->name }} • {{ $order->paid_at->format('h:i A') }}
                                         </small>
                                     </div>
-                                    <i class="bi bi-check-circle-fill text-success fs-3"></i>
+                                    <i class="bi bi-person-check-fill text-success fs-3"></i>
                                 </div>
                             </div>
                         @empty
                             <div class="text-center py-5 text-muted">
-                                <i class="bi bi-clock-history display-4 opacity-50"></i>
-                                <p class="mt-3">No medicines issued yet today</p>
+                                <i class="bi bi-people-fill display-4 opacity-50"></i>
+                                <p class="mt-3">No medicines handed over yet today</p>
                             </div>
                         @endforelse
                     </div>
@@ -171,7 +194,6 @@
     </div>
 </div>
 
-<!-- Custom Teal Button & Hover Effects (Bootstrap compatible) -->
 <style>
     .bg-gradient { background: linear-gradient(90deg, #0d9488, #0f766e) !important; }
     .hover-bg-light:hover { background-color: #f8f9fa !important; }

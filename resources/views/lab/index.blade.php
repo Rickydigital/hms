@@ -24,7 +24,7 @@
     <div class="container-fluid py-4">
         <div class="row g-4">
 
-            <!-- LEFT: SEARCH HISTORY + TODAY'S COMPLETED -->
+            <!-- LEFT: SEARCH HISTORY + TODAYS COMPLETED -->
             <div class="col-lg-5">
                 <div class="sticky-top" style="top: 20px;">
 
@@ -38,9 +38,7 @@
                         <div class="card-body p-4">
                             <form action="{{ route('lab.index') }}" method="GET">
                                 <div class="input-group input-group-lg shadow-sm">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        Search
-                                    </span>
+                                    <span class="input-group-text bg-white border-end-0">Search</span>
                                     <input type="text" name="search" class="form-control border-start-0 ps-0" 
                                            placeholder="Patient ID • Name • Phone" 
                                            value="{{ request('search') }}" autofocus>
@@ -72,7 +70,9 @@
                                                                         {{ $order->result?->is_abnormal ? 'Abnormal' : 'Normal' }}
                                                                     </span>
                                                                 @else
-                                                                    <span class="badge bg-warning text-dark">Pending</span>
+                                                                    <span class="badge bg-{{ $order->is_paid ? 'warning' : 'secondary' }} text-dark">
+                                                                        {{ $order->is_paid ? 'Pending' : 'Not Paid' }}
+                                                                    </span>
                                                                 @endif
                                                             </span>
                                                         </div>
@@ -137,11 +137,21 @@
                     </div>
                     <div class="card-body p-4" style="max-height: 85vh; overflow-y: auto;">
                         @forelse($pending as $order)
-                            <div class="card mb-4 border-0 shadow-sm hover-lift rounded-4 border-start border-primary border-5">
+                            <div class="card mb-4 border-0 shadow-sm rounded-4 
+                                {{ $order->is_paid ? 'border-start border-success border-5' : 'border-start border-danger border-5 opacity-75' }}">
                                 <div class="card-body p-4">
                                     <div class="row g-4">
                                         <div class="col-md-8">
-                                            <h5 class="text-primary mb-2">{{ $order->test->test_name }}</h5>
+                                            <div class="d-flex align-items-start justify-content-between mb-3">
+                                                <h5 class="text-primary mb-0">{{ $order->test->test_name }}</h5>
+                                                <div>
+                                                    @if($order->is_paid)
+                                                        <span class="badge bg-success fs-6">PAID</span>
+                                                    @else
+                                                        <span class="badge bg-danger fs-6">NOT PAID</span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                             <div class="mb-3">
                                                 <strong>Patient:</strong> {{ $order->visit->patient->name }}
                                                 <span class="text-muted">• {{ $order->visit->patient->patient_id }}</span>
@@ -154,10 +164,19 @@
                                             </div>
                                         </div>
                                         <div class="col-md-4 text-md-end">
-                                            <a href="{{ route('lab.order.show', $order) }}" 
-                                               class="btn btn-success btn-lg rounded-pill px-5 shadow">
-                                                Enter Result
-                                            </a>
+                                            @if($order->is_paid)
+                                                <a href="{{ route('lab.order.show', $order) }}" 
+                                                   class="btn btn-success btn-lg rounded-pill px-5 shadow">
+                                                    Enter Result
+                                                </a>
+                                            @else
+                                                <button class="btn btn-secondary btn-lg rounded-pill px-5" disabled>
+                                                    Payment Required
+                                                </button>
+                                                <small class="d-block text-danger mt-2">
+                                                    Patient must pay at billing first
+                                                </small>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -165,10 +184,10 @@
                         @empty
                             <div class="text-center py-5">
                                 <div class="mb-4">
-                                    <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                                    <i class="bi bi-cash-coin text-warning" style="font-size: 4rem;"></i>
                                 </div>
-                                <h3 class="text-success fw-bold">All Clear!</h3>
-                                <p class="text-muted">No pending tests. Excellent work!</p>
+                                <h3 class="text-warning fw-bold">No Paid Tests Yet</h3>
+                                <p class="text-muted">Waiting for patients to complete payment at billing counter.</p>
                             </div>
                         @endforelse
                     </div>
@@ -191,6 +210,9 @@
 }
 .rounded-4 {
     border-radius: 1rem !important;
+}
+.opacity-75 {
+    opacity: 0.75;
 }
 </style>
 @endsection
