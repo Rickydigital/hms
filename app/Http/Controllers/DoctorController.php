@@ -13,6 +13,7 @@ use App\Models\VisitBedAdmission;
 use App\Models\Ward;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class DoctorController extends Controller
 {
@@ -101,6 +102,14 @@ class DoctorController extends Controller
 
     public function storePrescription(Request $request, Visit $visit)
     {
+
+        Log::info('PRESCRIPTION STORE HIT', [
+            'visit_id' => $visit->id,
+            'all_input' => $request->except(['_token']),
+            'has_medicine' => $request->has('medicines'),
+            'medicines_raw' => $request->input('medicines'),
+        ]);
+
         $this->authorizeAccess();
 
         $request->validate([
@@ -109,11 +118,7 @@ class DoctorController extends Controller
             'diagnosis'       => 'nullable|string',
             'lab_tests.*'     => 'exists:lab_tests_master,id',
 
-            'medicines' => 'nullable|array',
-            'medicines.*.medicine_id'   => 'nullable|exists:medicines_master,id',
-            'medicines.*.dosage'        => 'required_if:medicines.*.medicine_id,!=,|string',
-            'medicines.*.duration_days' => 'required_if:medicines.*.medicine_id,!=,|integer|min:1',
-            'medicines.*.instruction'   => 'nullable|string',
+
 
             'injection_medicine_id' => 'nullable|exists:medicines_master,id',
             'injection_route'       => 'nullable|string',
@@ -129,7 +134,7 @@ class DoctorController extends Controller
         );
 
         $hasLab       = $request->filled('lab_tests');
-        $hasMedicine  = collect($request->medicines ?? [])->filter(fn($m) => !empty($m['medicine_id']))->count() > 0;
+        $hasMedicine = $request->has('medicines.medicine_id') && count($request->input('medicines.medicine_id', [])) > 0;
         $hasInjection = $request->filled('injection_medicine_id');
         $hasAdmission = $request->filled('ward_id');
 
@@ -145,18 +150,49 @@ class DoctorController extends Controller
             }
         }
 
-        // Medicine Orders
+        $hasMedicine = $request->filled('medicines.medicine_id');
+
         if ($hasMedicine) {
+            Log::info('MEDICINES REQUEST DATA:', $request->medicines ?? []);
+
+            $medicineIds       = $request->input('medicines.medicine_id', []);
+            $dosages           = $request->input('medicines.dosage', []);
+            $durationDays      = $request->input('medicines.duration_days', []);
+            $instructions      = $request->input('medicines.instruction', []);
+            $extraInstructions = $request->input('medicines.extra_instruction', []);
+
             $alreadyPrescribed = [];
             $newlyAdded = [];
+            $errors = [];
 
-            foreach ($request->medicines as $med) {
-                if (empty($med['medicine_id'])) {
+            foreach ($medicineIds as $index => $medicineId) {
+                if (empty($medicineId)) {
                     continue;
                 }
 
-                $medicineId = $med['medicine_id'];
-                $medicineName = \App\Models\MedicineMaster::find($medicineId)->medicine_name ?? 'Unknown Medicine';
+                $dosage           = $dosages[$index] ?? '';
+                $duration         = $durationDays[$index] ?? null;
+                $instruction      = $instructions[$index] ?? '';
+                $extraInstruction = $extraInstructions[$index] ?? '';
+
+                // Manual validation for this medicine
+                if (empty($dosage)) {
+                    $errors[] = "Dosage is required for selected medicine.";
+                }
+                if (empty($duration) || $duration < 1) {
+                    $errors[] = "Valid duration (at least 1 day) is required.";
+                }
+                $medicine = \App\Models\MedicineMaster::find($medicineId);
+                if (!$medicine) {
+                    $errors[] = "Invalid medicine selected.";
+                }
+
+                // If any error, collect and continue to next
+                if (!empty($errors)) {
+                    continue; // Don't save this one, but check others
+                }
+
+                $medicineName = $medicine->medicine_name;
 
                 $exists = VisitMedicineOrder::where('visit_id', $visit->id)
                     ->where('medicine_id', $medicineId)
@@ -166,29 +202,33 @@ class DoctorController extends Controller
                     $alreadyPrescribed[] = $medicineName;
                 } else {
                     VisitMedicineOrder::create([
-                        'visit_id'         => $visit->id,
-                        'medicine_id'      => $medicineId,
-                        'dosage'           => $med['dosage'] ?? '',
-                        'duration_days'    => $med['duration_days'] ?? 1,
-                        'instruction'      => $med['instruction'] ?? '',
-                        'extra_instruction'=> $med['extra_instruction'] ?? '',
+                        'visit_id'          => $visit->id,
+                        'medicine_id'       => $medicineId,
+                        'dosage'            => $dosage,
+                        'duration_days'     => $duration,
+                        'instruction'       => $instruction,
+                        'extra_instruction' => $extraInstruction,
                     ]);
                     $newlyAdded[] = $medicineName;
                 }
             }
 
+            // Only return errors if there were validation issues
+            if (!empty($errors)) {
+                return back()->withErrors($errors)->withInput();
+            }
+
+            // Success message
             $message = 'Prescription sent successfully!';
             if (!empty($alreadyPrescribed)) {
-                $list = implode(', ', $alreadyPrescribed);
-                $message .= " | Already prescribed (not added again): $list";
+                $message .= ' | Already prescribed (not added again): ' . implode(', ', $alreadyPrescribed);
             }
-            if (!empty($newlyAdded) && empty($alreadyPrescribed)) {
-                $message = 'Prescription sent successfully! Medicines added: ' . implode(', ', $newlyAdded);
+            if (!empty($newlyAdded)) {
+                $message .= ' | New medicines added: ' . implode(', ', $newlyAdded);
             }
 
             return back()->with('success', $message);
         }
-
         // Injection
         if ($hasInjection) {
             VisitInjectionOrder::create([
@@ -224,9 +264,7 @@ class DoctorController extends Controller
         if ($hasAnyService) {
             // Doctor ordered services → send to billing immediately
             $visit->update([
-                'status' => $hasLab ? 'sent_to_lab' :
-                           ($hasMedicine || $hasInjection ? 'sent_to_pharmacy' :
-                           ($hasAdmission ? 'admitted' : 'consulting')),
+                'status' => $hasLab ? 'sent_to_lab' : ($hasMedicine || $hasInjection ? 'sent_to_pharmacy' : ($hasAdmission ? 'admitted' : 'consulting')),
                 'all_services_completed' => false  // Services pending payment/completion
             ]);
         } else {

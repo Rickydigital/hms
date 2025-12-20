@@ -314,28 +314,35 @@
                             <div class="row g-4">
 
                                 <!-- LAB TESTS -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-body">
-                                            <h6 class="section-title text-info">Lab Tests (Optional)</h6>
-                                            <div id="labContainer">
-                                                <template id="labTemplate">
-                                                    <div class="prescription-item position-relative mb-3 p-3 bg-light rounded-3 border">
-                                                        <button type="button" class="remove-prescription position-absolute top-0 end-0 btn btn-sm btn-danger rounded-circle m-2">×</button>
-                                                        <select name="lab_tests[]" class="form-select form-select-lg">
-                                                            <option value="">Choose Lab Test</option>
-                                                            @foreach(\App\Models\LabTestMaster::active()->orderBy('test_name')->get() as $test)
-                                                                <option value="{{ $test->id }}">{{ $test->test_name }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                            <button type="button" id="addLabTest" class="btn btn-info rounded-pill px-5 py-3 mt-3 shadow">Add Lab Test</button>
-                                            <textarea name="lab_instruction" class="form-control mt-3" rows="2" placeholder="Special instruction for lab..."></textarea>
-                                        </div>
-                                    </div>
-                                </div>
+<div class="col-md-6">
+    <div class="card">
+        <div class="card-body">
+            <h6 class="section-title text-info">Lab Tests (Optional)</h6>
+            <div id="labContainer">
+                <template id="labTemplate">
+                    <div class="prescription-item position-relative mb-3 p-3 bg-light rounded-3 border">
+                        <button type="button" class="remove-prescription position-absolute top-0 end-0 btn btn-sm btn-danger rounded-circle m-2">×</button>
+                        
+                        <select name="lab_tests[]" class="form-select form-select-lg select2-lab" multiple="multiple" style="width: 100%;">
+                            <option value="">Search lab tests...</option>
+                            @foreach(\App\Models\LabTestMaster::active()->orderBy('test_name')->get() as $test)
+                                <option value="{{ $test->id }}" data-price="{{ $test->price }}">
+                                    {{ $test->test_name }} — {{ number_format($test->price) }} Tsh
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </template>
+            </div>
+            
+            <button type="button" id="addLabTest" class="btn btn-info rounded-pill px-5 py-3 mt-3 shadow">
+                Add Lab Test Group
+            </button>
+            
+            <textarea name="lab_instruction" class="form-control mt-3" rows="2" placeholder="Special instruction for lab..."></textarea>
+        </div>
+    </div>
+</div>
 
                                 <!-- MEDICINES -->
                                 <div class="col-md-6">
@@ -343,48 +350,48 @@
                                         <div class="card-body">
                                             <h6 class="section-title text-success">Medicines (Optional)</h6>
                                             <div id="medicineContainer">
-                                                <template id="medicineTemplate">
-                                                    <div class="item-card position-relative mb-4 p-5 rounded-4 border border-primary border-opacity-10">
-                                                        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">×</button>
+                                                      <template id="medicineTemplate">
+    <div class="item-card position-relative mb-4 p-5 rounded-4 border border-primary border-opacity-10">
+        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">×</button>
 
-                                                        <div class="mb-4">
-                                                            <label class="form-label fw-bold text-primary fs-5">Medicine Name</label>
-                                                            <select name="medicines[][medicine_id]" class="form-select form-select-lg select2-medicine" style="width:100%;">
-                                                                <option value="">Search medicine...</option>
-                                                                @foreach(\App\Models\MedicineMaster::active()->get() as $m)
-                                                                    <option value="{{ $m->id }}">
-                                                                        {{ $m->medicine_name }} @if($m->generic_name) • {{ $m->generic_name }} @endif
-                                                                        @if($m->strength) • {{ $m->strength }} @endif
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
-                                                        </div>
+        <div class="mb-4">
+            <label class="form-label fw-bold text-primary fs-5">Medicine Name</label>
+            <select name="medicines[medicine_id][]" class="form-select form-select-lg select2-medicine" style="width:100%;">
+                <option value="">Search medicine...</option>
+                @foreach(\App\Models\MedicineMaster::active()->get() as $m)
+                    <option value="{{ $m->id }}">
+                        {{ $m->medicine_name }} @if($m->generic_name) • {{ $m->generic_name }} @endif
+                        @if($m->strength) • {{ $m->strength }} @endif
+                    </option>
+                @endforeach
+            </select>
+        </div>
 
-                                                        <div class="mb-4">
-                                                            <label class="form-label fw-bold text-info">Dosage</label>
-                                                            <input type="text" name="medicines[][dosage]" class="form-control form-control-lg text-center fw-bold fs-4" 
-                                                                   placeholder="e.g. 1-0-1 or 1 tab twice daily">
-                                                        </div>
+        <div class="mb-4">
+            <label class="form-label fw-bold text-info">Dosage</label>
+            <input type="text" name="medicines[dosage][]" class="form-control form-control-lg text-center fw-bold fs-4" 
+                   placeholder="e.g. 1-0-1 or 1 tab twice daily">
+        </div>
 
-                                                        <div class="mb-4">
-                                                            <label class="form-label fw-bold text-warning">Duration (Days)</label>
-                                                            <input type="number" name="medicines[][duration_days]" min="1" class="form-control form-control-lg text-center fw-bold fs-4" 
-                                                                   placeholder="5">
-                                                        </div>
+        <div class="mb-4">
+            <label class="form-label fw-bold text-warning">Duration (Days)</label>
+            <input type="number" name="medicines[duration_days][]" min="1" class="form-control form-control-lg text-center fw-bold fs-4" 
+                   placeholder="5">
+        </div>
 
-                                                        <div class="mb-4">
-                                                            <label class="form-label fw-bold text-purple">Frequency / Timing</label>
-                                                            <input type="text" name="medicines[][instruction]" class="form-control form-control-lg" 
-                                                                   placeholder="e.g. After food, Before sleep, SOS, With water...">
-                                                        </div>
+        <div class="mb-4">
+            <label class="form-label fw-bold text-purple">Frequency / Timing</label>
+            <input type="text" name="medicines[instruction][]" class="form-control form-control-lg" 
+                   placeholder="e.g. After food, Before sleep, SOS, With water...">
+        </div>
 
-                                                        <div class="mt-4">
-                                                            <label class="form-label text-success fw-bold">Additional Instruction (Optional)</label>
-                                                            <textarea name="medicines[][extra_instruction]" class="form-control" rows="3" 
-                                                                      placeholder="Take with plenty of water, Avoid dairy, etc..."></textarea>
-                                                        </div>
-                                                    </div>
-                                                </template>
+        <div class="mt-4">
+            <label class="form-label text-success fw-bold">Additional Instruction (Optional)</label>
+            <textarea name="medicines[extra_instruction][]" class="form-control" rows="3" 
+                      placeholder="Take with plenty of water, Avoid dairy, etc..."></textarea>
+        </div>
+    </div>
+</template>
                                             </div>
                                             <button type="button" id="addMedicineRow" class="btn btn-success rounded-pill px-5 py-3 mt-3 shadow">
                                                 Add Medicine
@@ -497,6 +504,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const row = template.querySelector('.item-card');
         document.getElementById('medicineContainer').appendChild(row);
 
+        // Initialize Select2 on the newly added select
         $(row).find('.select2-medicine').select2({
             placeholder: "Search medicine...",
             allowClear: true,
@@ -505,63 +513,112 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Add Lab Test
-    document.getElementById('addLabTest')?.addEventListener('click', function () {
-        const template = document.getElementById('labTemplate').content.cloneNode(true);
-        const item = template.querySelector('.prescription-item');
-        document.getElementById('labContainer').appendChild(item);
-    });
+    // Add Lab Test Row + Initialize Select2
+document.getElementById('addLabTest')?.addEventListener('click', function () {
+    const template = document.getElementById('labTemplate').content.cloneNode(true);
+    const item = template.querySelector('.prescription-item');
+    document.getElementById('labContainer').appendChild(item);
 
-    // Remove items
+    // Initialize Select2 on the new lab select
+    $(item).find('.select2-lab').select2({
+        placeholder: "Search and select lab tests...",
+        allowClear: true,
+        width: '100%',
+        templateResult: formatLabOption,
+        templateSelection: formatLabSelection
+    });
+});
+
+// Optional: Custom formatting to show price nicely
+function formatLabOption(option) {
+    if (!option.id) return option.text;
+    
+    var $option = $(
+        '<span>' + option.text + '</span>'
+    );
+    return $option;
+}
+
+function formatLabSelection(option) {
+    return option.text || 'No tests selected';
+}
+
+
+
+    // Remove items (delegated event)
     document.addEventListener('click', function (e) {
         if (e.target.classList.contains('remove-item') || e.target.closest('.remove-item')) {
             e.target.closest('.item-card')?.remove();
         }
-        if (e.target.classList.contains('remove-prescription')) {
+        if (e.target.classList.contains('remove-prescription') || e.target.closest('.remove-prescription')) {
             e.target.closest('.prescription-item')?.remove();
         }
     });
 
-    // Form validation before submit
+    // Form validation on submit
     form.addEventListener('submit', function (e) {
         let hasError = false;
 
+        // Validate and clean medicine rows
         document.querySelectorAll('#medicineContainer .item-card').forEach(card => {
-            const medicineSelect = card.querySelector('select[name$="[medicine_id]"]');
-            const dosageInput = card.querySelector('input[name$="[dosage]"]');
-            const durationInput = card.querySelector('input[name$="[duration_days]"]');
+        // Updated selectors to match new name format
+        const medicineSelect = card.querySelector('select[name="medicines[medicine_id][]"]');
+        const dosageInput = card.querySelector('input[name="medicines[dosage][]"]');
+        const durationInput = card.querySelector('input[name="medicines[duration_days][]"]');
 
-            const hasMedicine = medicineSelect && medicineSelect.value.trim() !== '';
-            const hasDosage = dosageInput && dosageInput.value.trim() !== '';
-            const hasDuration = durationInput && durationInput.value.trim() !== '';
+        if (!medicineSelect || !dosageInput || !durationInput) {
+            card.remove(); // safety
+            return;
+        }
 
-            if (hasMedicine || hasDosage || hasDuration) {
-                if (!hasMedicine || !hasDosage || !hasDuration) {
-                    alert('Please complete all fields for the medicine or remove the row.');
-                    hasError = true;
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    card.style.border = '3px solid red';
-                    setTimeout(() => card.style.border = '', 5000);
-                }
-            } else {
-                card.remove();
+        const medicineId = medicineSelect.value.trim();
+        const dosage = dosageInput.value.trim();
+        const duration = durationInput.value.trim();
+
+        // Remove completely empty rows
+        if (!medicineId && !dosage && !duration) {
+            card.remove();
+            return;
+        }
+
+        // If any field filled → require all three
+        if (medicineId || dosage || duration) {
+            if (!medicineId || !dosage || !duration) {
+                alert('Please fill Medicine Name, Dosage, and Duration for all added medicines, or remove the row.');
+                hasError = true;
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                card.style.border = '4px solid red';
+                setTimeout(() => card.style.border = '', 6000);
+            }
+        }
+    });
+
+        // Clean up empty lab tests
+        document.querySelectorAll('#labContainer .prescription-item').forEach(item => {
+            const select = item.querySelector('select[name="lab_tests[]"]');
+            if (select && !select.value) {
+                item.remove();
             }
         });
 
-        document.querySelectorAll('#labContainer .prescription-item').forEach(item => {
-            const select = item.querySelector('select');
-            if (select && !select.value) item.remove();
-        });
-
-        if (!injMedSelect.value) injRouteInput.value = '';
-        if (!wardSelect.value) admissionReason.value = '';
+        // Clear injection/admission if not selected
+        if (!injMedSelect.value) {
+            injRouteInput.value = '';
+        }
+        if (!wardSelect.value) {
+            admissionReason.value = '';
+        }
 
         if (hasError) {
             e.preventDefault();
         }
     });
 
-    // Auto-add one medicine row on load
-    setTimeout(() => document.getElementById('addMedicineRow')?.click(), 100);
+    // Optional: Auto-add one blank medicine row when page loads
+    setTimeout(() => {
+        const addBtn = document.getElementById('addMedicineRow');
+        if (addBtn) addBtn.click();
+    }, 100);
 });
 </script>
 

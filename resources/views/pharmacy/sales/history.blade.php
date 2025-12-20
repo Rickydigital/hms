@@ -27,33 +27,83 @@
                     <thead class="bg-teal text-white">
                         <tr>
                             <th>Date & Time</th>
-                            <th>Invoice</th>
+                            <th>Medicine Name</th>
                             <th>Customer</th>
                             <th>Items</th>
-                            <th class="text-end">Total</th>
+                            @role('Admin')<th class="text-end">Total</th>@endrole
                             <th>Served By</th>
-                            <th>Action</th>
+                            @role('Admin')<th>Action</th>@endrole
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($sales as $sale)
-                        <tr>
-                            <td>{{ $sale->sold_at->format('d M Y') }}<br><small>{{ $sale->sold_at->format('h:i A') }}</small></td>
-                            <td><span class="badge bg-primary">{{ $sale->invoice_no }}</span></td>
-                            <td>{{ $sale->customer_name ?: 'Walk-in' }}</td>
-                            <td>{{ $sale->items->count() }} item(s)</td>
-                            <td class="text-end fw-bold text-teal-700">Tsh {{ number_format($sale->total_amount) }}</td>
-                            <td>{{ $sale->soldBy->name }}</td>
-                            <td>
-                                <a href="{{ route('pharmacy.sales.receipt', $sale) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-printer"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="7" class="text-center py-5 text-muted">No OTC sales yet</td></tr>
-                        @endforelse
-                    </tbody>
+    @forelse($sales as $sale)
+        <tr>
+            <td>
+                {{ $sale->sold_at->format('d M Y') }}<br>
+                <small class="text-muted">{{ $sale->sold_at->format('h:i A') }}</small>
+            </td>
+
+            <td>
+                @if($sale->items->count() == 1)
+                    <span class="badge bg-primary">
+                        {{ $sale->items->first()->medicine?->medicine_name ?? 'Deleted Medicine' }}
+                    </span>
+                @else
+                    <span class="badge bg-info">
+                        {{ $sale->items->count() }} Medicines
+                    </span>
+                @endif
+            </td>
+
+            <td>
+                <strong>{{ $sale->customer_name ?: 'Walk-in' }}</strong>
+                @if($sale->customer_phone)
+                    <br><small class="text-muted">{{ $sale->customer_phone }}</small>
+                @endif
+            </td>
+
+            <td>
+                <ul class="mb-0 ps-3 small">
+                    @foreach($sale->items as $item)
+                        <li>
+                            <strong>{{ $item->medicine?->medicine_name ?? 'Deleted Medicine' }}</strong>
+                            @if($item->medicine?->generic_name)
+                                <small class="text-muted">• {{ $item->medicine->generic_name }}</small>
+                            @endif
+                            <br>
+                            <small class="text-muted">
+                                Qty: {{ $item->quantity }} 
+                            </small>
+                        </li>
+                    @endforeach
+                </ul>
+            </td>
+
+            @role('Admin')
+            <td class="text-end fw-bold text-teal-700">
+                {{ number_format($sale->total_amount) }} Tshs
+            </td>
+            @endrole
+
+            <td>{{ $sale->soldBy?->name ?? 'Unknown' }}</td>
+
+            @role('Admin')
+            <td>
+                <a href="{{ route('pharmacy.sales.receipt', $sale) }}" 
+                   class="btn btn-sm btn-outline-primary" title="Print Receipt">
+                    <i class="bi bi-printer"></i>
+                </a>
+            </td>
+            @endrole
+        </tr>
+    @empty
+        <tr>
+            <td colspan="7" class="text-center py-5 text-muted">
+                No OTC sales recorded yet
+            </td>
+        </tr>
+    @endforelse
+</tbody>
                 </table>
             </div>
             <div class="card-footer bg-light">
