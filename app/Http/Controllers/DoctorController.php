@@ -52,7 +52,7 @@ class DoctorController extends Controller
 
             $visit = Visit::updateOrCreate(
                 ['patient_id' => $patient->id, 'visit_date' => today()],
-                ['visit_time' => now(), 'registration_amount' => setting('registration_fee', 200), 'status' => 'consulting']
+                ['visit_time' => now(), 'registration_amount' => setting('registration_fee', 0), 'status' => 'consulting']
             );
 
             return redirect()->route('doctor.opd.show', $visit);

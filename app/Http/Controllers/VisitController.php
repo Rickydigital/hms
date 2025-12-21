@@ -48,7 +48,7 @@ public function store(Request $request, Patient $patient)
                 'visit_date'          => today(),
                 'visit_time'          => now(),
                 'status'              => 'in_opd',
-                'registration_amount' => 200.00,
+                'registration_amount' => 0.00,
                 'registration_paid'   => true,
             ]);
 
