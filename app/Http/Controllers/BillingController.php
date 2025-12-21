@@ -91,46 +91,43 @@ class BillingController extends Controller
 
  private function calculateBill($visit)
 {
-    $regFee     = Setting::get('registration_fee', 0);
-    $consultFee = $visit->doctor->consultation_fee ?? Setting::get('consultation_fee', 0);
+    // === NO REGISTRATION OR CONSULTATION FEES ANYMORE ===
+    // These are completely removed from billing
 
-    // 1. Medicines: Only issued, and load pharmacy issues to get correct quantity
+    // 1. Medicines: Only issued ones, with correct issued quantity
     $medicines = $visit->medicineOrders()
         ->where('is_issued', true)
-        ->with(['medicine', 'pharmacyIssues']) // ← Critical: load issues for quantity
+        ->with(['medicine', 'pharmacyIssues'])
         ->get();
 
-    // 2. Lab Tests: Only UNPAID ones
+    // 2. Lab Tests: Only unpaid ones
     $labTests = $visit->labOrders()
         ->where('is_paid', false)
         ->with('test')
         ->get();
 
-    // 3. Injections (assuming no payment flag yet)
+    // 3. Injections: Only given ones
     $injections = $visit->injectionOrders()
         ->where('is_given', true)
         ->with('medicine')
         ->get();
 
-    // 4. Bed charges
+    // 4. Bed/Ward charges
     $bedAdmission = $visit->bedAdmission()->where('is_discharged', true)->first();
     $bedCharges = $bedAdmission?->bed_charges ?? 0;
     $bedDays    = $bedAdmission?->total_days ?? 0;
 
-    // Check if any receipt exists (for showing reg/consult once)
-    $hasReceipt = $visit->receipt()->exists();
+    // We no longer need to check for receipt to show reg/consult
+    // $hasReceipt = $visit->receipt()->exists();
+    // $showRegConsult = !$hasReceipt;
 
-    // Show registration & consultation only if no receipt yet
-    $showRegConsult = !$hasReceipt;
+    // Force false - no reg/consult fees will ever be shown or added
+    $showRegConsult = false;
 
-    // Calculate grand total
+    // === CALCULATE GRAND TOTAL - ONLY ACTUAL SERVICES ===
     $grandTotal = 0;
 
-    if ($showRegConsult) {
-        $grandTotal += $regFee + $consultFee;
-    }
-
-    // Medicines: Use actual issued quantity from pharmacy_issues table
+    // Medicines (using actual issued quantity)
     $grandTotal += $medicines->sum(function ($order) {
         $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
         return $issuedQty * $order->medicine->price;
@@ -145,16 +142,15 @@ class BillingController extends Controller
     // Bed charges
     $grandTotal += $bedCharges;
 
-    // Show generate button only if there are unpaid items
-    $hasUnpaidItems = $medicines->isNotEmpty() 
-        || $labTests->isNotEmpty() 
-        || $injections->isNotEmpty() 
-        || $bedCharges > 0 
-        || $showRegConsult; // reg/consult if not yet billed
+    // === DETERMINE IF GENERATE BUTTON SHOULD BE SHOWN ===
+    $hasUnpaidItems = $medicines->isNotEmpty()
+        || $labTests->isNotEmpty()
+        || $injections->isNotEmpty()
+        || $bedCharges > 0;
 
     $showGenerateButton = $hasUnpaidItems && $grandTotal > 0;
 
-    // Sidebar data (unchanged)
+    // === SIDEBAR DATA (Pending, In Progress, Receipts) ===
     $pendingVisits = Visit::with(['patient', 'doctor'])
         ->where(function ($q) {
             $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
@@ -181,22 +177,21 @@ class BillingController extends Controller
         ->latest('generated_at')
         ->get();
 
+    // === RETURN VIEW WITH CLEANED VARIABLES ===
     return view('billing.index', compact(
         'visit',
-        'regFee',
-        'consultFee',
         'medicines',
         'labTests',
         'injections',
         'bedCharges',
         'bedDays',
         'grandTotal',
-        'showRegConsult',
         'showGenerateButton',
         'pendingVisits',
         'pendingCount',
         'inProgressVisits',
         'receipts'
+        // 'regFee', 'consultFee', 'showRegConsult' → removed entirely
     ));
 }
 

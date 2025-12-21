@@ -65,23 +65,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                               @if($showRegConsult && $regFee > 0)
-                                <tr>
-                                    <td>Registration Fee</td>
-                                    <td class="text-center">1</td>
-                                    <td class="text-end">Tsh{{ number_format($regFee, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format($regFee, 0) }}</td>
-                                </tr>
-                                @endif
-
-                                @if($showRegConsult && $consultFee > 0)
-                                <tr>
-                                    <td>Doctor Consultation Fee</td>
-                                    <td class="text-center">1</td>
-                                    <td class="text-end">Tsh{{ number_format($consultFee, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format($consultFee, 0) }}</td>
-                                </tr>
-                                @endif
+                               
 
                                 @foreach($medicines as $m)
                                 @php
@@ -294,9 +278,9 @@
                                     <tr>
                                         <th>Receipt Date</th>
                                         <th>Patient</th>
-                                        <th>Visit ID</th>
+                                        {{--  <th>Visit ID</th>  --}}
                                         <th>Total</th>
-                                        <th>Paid</th>
+                                        @role('Admin')<th>Paid</th>@endrole
                                         <th>Balance</th>
                                         <th>Status</th>
                                         <th class="text-center">Actions</th>
@@ -311,9 +295,9 @@
                                     <tr>
                                         <td>{{ $r->generated_at->format('d M Y H:i') }}</td>
                                         <td>{{ $r->visit->patient->name }}</td>
-                                        <td>#{{ $r->visit->id }}</td>
+                                        {{--  <td>#{{ $r->visit->id }}</td>  --}}
                                         <td>Tsh{{ number_format($r->grand_total, 0) }}</td>
-                                        <td>Tsh{{ number_format($paid, 0) }}</td>
+                                        @role('Admin')<td>Tsh{{ number_format($paid, 0) }}</td>@endrole
                                         <td>
                                             @if($balance > 0)
                                                 <strong class="text-danger">Tsh{{ number_format($balance, 0) }}</strong>

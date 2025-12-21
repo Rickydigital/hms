@@ -186,28 +186,39 @@
                     <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
                         <h5 class="mb-0 fw-bold">
                             Given to Patients Today 
-                            <span class="badge bg-light text-success ms-3">{{ $givenToday->count() }}</span>
+                            <span class="badge bg-light text-success ms-3">
+                                {{ $givenToday->count() }} order{{ $givenToday->count() != 1 ? 's' : '' }}
+                            </span>
+                            <span class="badge bg-primary ms-2">
+                                Total Qty: {{ $givenToday->sum('quantity_issued') }}
+                            </span>
                         </h5>
                     </div>
                     <div class="card-body p-0" style="max-height: 78vh; overflow-y: auto;">
                         @forelse($givenToday as $order)
-                            <div class="p-4 border-bottom hover-bg-light">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div class="fw-bold text-success">{{ $order->medicine->medicine_name }}</div>
-                                        <small class="text-muted">
-                                            {{ $order->visit->patient->name }} • {{ $order->paid_at->format('h:i A') }}
-                                        </small>
+                        <div class="p-4 border-bottom hover-bg-light">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-bold text-success">
+                                        {{ $order->medicine->medicine_name }}
+                                        <span class="badge bg-success ms-2">
+                                            Qty: {{ $order->quantity_issued ?? 1 }}
+                                        </span>
                                     </div>
-                                    <i class="bi bi-person-check-fill text-success fs-3"></i>
+                                    <small class="text-muted">
+                                        {{ $order->visit->patient->name }}
+                                        • {{ $order->paid_at->format('h:i A') }}
+                                    </small>
                                 </div>
+                                <i class="bi bi-person-check-fill text-success fs-3"></i>
                             </div>
-                        @empty
-                            <div class="text-center py-5 text-muted">
-                                <i class="bi bi-people-fill display-4 opacity-50"></i>
-                                <p class="mt-3">No medicines handed over yet today</p>
-                            </div>
-                        @endforelse
+                        </div>
+                    @empty
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-people-fill display-4 opacity-50"></i>
+                            <p class="mt-3">No medicines handed over yet today</p>
+                        </div>
+                    @endforelse
                     </div>
                 </div>
             </div>
