@@ -84,4 +84,10 @@ public function profitMargin($batchPurchasePrice)
 {
     return $this->selling_price - $batchPurchasePrice;
 }
+
+public function scopeInStock($query)
+{
+    return $query->withSum('batches as current_stock', 'current_stock')
+                 ->having('current_stock', '>', 0);
+}
 }

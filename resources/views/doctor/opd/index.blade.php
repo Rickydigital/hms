@@ -345,60 +345,72 @@
 </div>
 
                                 <!-- MEDICINES -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-body">
-                                            <h6 class="section-title text-success">Medicines (Optional)</h6>
-                                            <div id="medicineContainer">
-                                                      <template id="medicineTemplate">
-    <div class="item-card position-relative mb-4 p-5 rounded-4 border border-primary border-opacity-10">
-        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">×</button>
+<div class="col-md-6">
+    <div class="card">
+        <div class="card-body">
+            <h6 class="section-title text-success">Medicines (Optional)</h6>
+            <div id="medicineContainer">
+                <template id="medicineTemplate">
+                    <div class="item-card position-relative mb-4 p-5 rounded-4 border border-primary border-opacity-10">
+                        <button type="button" class="remove-item btn btn-danger rounded-circle shadow-sm">×</button>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-primary fs-5">Medicine Name</label>
-            <select name="medicines[medicine_id][]" class="form-select form-select-lg select2-medicine" style="width:100%;">
-                <option value="">Search medicine...</option>
-                @foreach(\App\Models\MedicineMaster::active()->get() as $m)
-                    <option value="{{ $m->id }}">
-                        {{ $m->medicine_name }} @if($m->generic_name) • {{ $m->generic_name }} @endif
-                        @if($m->strength) • {{ $m->strength }} @endif
-                    </option>
-                @endforeach
-            </select>
-        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-primary fs-5">Medicine Name</label>
+                            <select name="medicines[medicine_id][]" class="form-select form-select-lg select2-medicine" style="width:100%;">
+                                <option value="">Search medicine...</option>
+                                @foreach(
+                                    \App\Models\MedicineMaster::active()
+                                        ->withSum('batches as current_stock', 'current_stock')
+                                        ->having('current_stock', '>', 0)
+                                        ->orderBy('medicine_name')
+                                        ->get() as $m
+                                )
+                                    <option value="{{ $m->id }}"
+                                            data-stock="{{ $m->current_stock }}">
+                                        {{ $m->medicine_name }}
+                                        @if($m->generic_name) • {{ $m->generic_name }} @endif
+                                        @if($m->strength) • {{ $m->strength }} @endif
+                                        <span class="text-muted small"> — Stock: {{ $m->current_stock }}</span>
+                                        @if($m->current_stock <= 10)
+                                            <span class="text-danger fw-bold"> (Low Stock!)</span>
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-info">Dosage</label>
-            <input type="text" name="medicines[dosage][]" class="form-control form-control-lg text-center fw-bold fs-4" 
-                   placeholder="e.g. 1-0-1 or 1 tab twice daily">
-        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-info">Dosage</label>
+                            <input type="text" name="medicines[dosage][]" class="form-control form-control-lg text-center fw-bold fs-4" 
+                                   placeholder="e.g. 1-0-1 or 1 tab twice daily">
+                        </div>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-warning">Duration (Days)</label>
-            <input type="number" name="medicines[duration_days][]" min="1" class="form-control form-control-lg text-center fw-bold fs-4" 
-                   placeholder="5">
-        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-warning">Duration (Days)</label>
+                            <input type="number" name="medicines[duration_days][]" min="1" class="form-control form-control-lg text-center fw-bold fs-4" 
+                                   placeholder="5">
+                        </div>
 
-        <div class="mb-4">
-            <label class="form-label fw-bold text-purple">Frequency / Timing</label>
-            <input type="text" name="medicines[instruction][]" class="form-control form-control-lg" 
-                   placeholder="e.g. After food, Before sleep, SOS, With water...">
-        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-purple">Frequency / Timing</label>
+                            <input type="text" name="medicines[instruction][]" class="form-control form-control-lg" 
+                                   placeholder="e.g. After food, Before sleep, SOS, With water...">
+                        </div>
 
-        <div class="mt-4">
-            <label class="form-label text-success fw-bold">Additional Instruction (Optional)</label>
-            <textarea name="medicines[extra_instruction][]" class="form-control" rows="3" 
-                      placeholder="Take with plenty of water, Avoid dairy, etc..."></textarea>
+                        <div class="mt-4">
+                            <label class="form-label text-success fw-bold">Additional Instruction (Optional)</label>
+                            <textarea name="medicines[extra_instruction][]" class="form-control" rows="3" 
+                                      placeholder="Take with plenty of water, Avoid dairy, etc..."></textarea>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <button type="button" id="addMedicineRow" class="btn btn-success rounded-pill px-5 py-3 mt-3 shadow">
+                Add Medicine
+            </button>
         </div>
     </div>
-</template>
-                                            </div>
-                                            <button type="button" id="addMedicineRow" class="btn btn-success rounded-pill px-5 py-3 mt-3 shadow">
-                                                Add Medicine
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+</div>
 
                                 <!-- INJECTION -->
                                 <div class="col-md-6">

@@ -19,6 +19,8 @@ class PatientVital extends Model
         'respiration',
         'chief_complaint',
         'history',
+        'examination', 
+        'diagnosis',
     ];
 
     protected function casts(): array

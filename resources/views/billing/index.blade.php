@@ -287,53 +287,70 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse($receipts as $r)
-                                    @php
-                                        $paid = $r->visit->payments()->sum('amount');
-                                        $balance = $r->grand_total - $paid;
-                                    @endphp
-                                    <tr>
-                                        <td>{{ $r->generated_at->format('d M Y H:i') }}</td>
-                                        <td>{{ $r->visit->patient->name }}</td>
-                                        {{--  <td>#{{ $r->visit->id }}</td>  --}}
-                                        <td>Tsh{{ number_format($r->grand_total, 0) }}</td>
-                                        @role('Admin')<td>Tsh{{ number_format($paid, 0) }}</td>@endrole
-                                        <td>
-                                            @if($balance > 0)
-                                                <strong class="text-danger">Tsh{{ number_format($balance, 0) }}</strong>
-                                            @else
-                                                <span class="text-success fw-bold">PAID</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if($balance <= 0)
-                                                <span class="badge bg-success">PAID</span>
-                                            @elseif($paid > 0)
-                                                <span class="badge bg-warning text-dark">PARTIAL</span>
-                                            @else
-                                                <span class="badge bg-danger">UNPAID</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-center">
-                                            <button type="button" class="btn btn-outline-info btn-sm rounded-circle me-2"
-                                                    data-bs-toggle="modal" data-bs-target="#viewPaymentModal"
-                                                    onclick="loadPaymentDetails({{ $r->visit->id }})">
-                                                View
-                                            </button>
+    @php
+        // Group receipts by patient + date
+        $groupedReceipts = $receipts->groupBy(function ($r) {
+            return $r->visit->patient->id . '|' . $r->generated_at->format('Y-m-d');
+        });
+    @endphp
 
-                                            @if($balance > 0)
-                                                <button type="button" class="btn btn-primary btn-sm rounded-pill"
-                                                        data-bs-toggle="modal" data-bs-target="#paymentModal"
-                                                        onclick="openRecordPayment({{ $r->visit->id }}, '{{ addslashes($r->visit->patient->name) }}', {{ $r->grand_total }}, {{ $paid }}, {{ $balance }})">
-                                                    Pay
-                                                </button>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                    @empty
-                                    <tr><td colspan="8" class="text-center py-5 text-muted fs-4">No receipts yet</td></tr>
-                                    @endforelse
-                                </tbody>
+    @forelse($groupedReceipts as $key => $group)
+        @php
+            [$patientId, $date] = explode('|', $key);
+            $firstReceipt = $group->first();
+            $patient = $firstReceipt->visit->patient;
+            $totalBilled = $group->sum('grand_total');
+            $totalPaid = $firstReceipt->visit->payments()
+                ->whereDate('paid_at', $date)
+                ->sum('amount');
+            $balance = $totalBilled - $totalPaid;
+        @endphp
+        <tr>
+            <td>{{ \Carbon\Carbon::parse($date)->format('d M Y') }}</td>
+            <td>
+                <strong>{{ $patient->name }}</strong><br>
+                <small class="text-muted">{{ $patient->patient_id }}</small>
+            </td>
+            <td>Tsh{{ number_format($totalBilled, 0) }}</td>
+            @role('Admin')
+            <td>Tsh{{ number_format($totalPaid, 0) }}</td>
+            @endrole
+            <td>
+                @if($balance > 0)
+                    <strong class="text-danger">Tsh{{ number_format($balance, 0) }}</strong>
+                @else
+                    <span class="text-success fw-bold">PAID</span>
+                @endif
+            </td>
+            <td>
+                @if($balance <= 0)
+                    <span class="badge bg-success">PAID</span>
+                @elseif($totalPaid > 0)
+                    <span class="badge bg-warning text-dark">PARTIAL</span>
+                @else
+                    <span class="badge bg-danger">UNPAID</span>
+                @endif
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-outline-info btn-sm rounded-circle me-2"
+                        data-bs-toggle="modal" data-bs-target="#viewPaymentModal"
+                        onclick="loadPaymentDetails({{ $firstReceipt->visit->id }})">
+                    View
+                </button>
+
+                @if($balance > 0)
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill"
+                            data-bs-toggle="modal" data-bs-target="#paymentModal"
+                            onclick="openRecordPayment({{ $firstReceipt->visit->id }}, '{{ addslashes($patient->name) }}', {{ $totalBilled }}, {{ $totalPaid }}, {{ $balance }})">
+                        Pay
+                    </button>
+                @endif
+            </td>
+        </tr>
+    @empty
+        <tr><td colspan="8" class="text-center py-5 text-muted fs-4">No receipts yet</td></tr>
+    @endforelse
+</tbody>
                             </table>
                         </div>
                     </div>
@@ -445,13 +462,13 @@ function loadPaymentDetails(visitId) {
                 <h5>Patient: <strong>${data.patient}</strong> | Visit #${visitId}</h5>
                 <hr>
                 <div class="row mb-4">
-                    <div class="col-md-4"><strong>Total Bill:</strong> Tsh${data.total.toLocaleString()}</div>
+                    {{--  <div class="col-md-4"><strong>Total Bill:</strong> Tsh${data.total.toLocaleString()}</div>  --}}
                     <div class="col-md-4"><strong>Paid:</strong> Tsh${data.paid.toLocaleString()}</div>
-                    <div class="col-md-4"><strong>Balance:</strong> 
+                    {{--  <div class="col-md-4"><strong>Balance:</strong> 
                         <span class="${data.balance > 0 ? 'text-danger' : 'text-success'} fw-bold">
                             Tsh${data.balance.toLocaleString()}
                         </span>
-                    </div>
+                    </div>  --}}
                 </div>
                 <h6 class="mt-4 text-success fw-bold">Payment History</h6>
             `;
