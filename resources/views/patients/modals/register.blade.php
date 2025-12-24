@@ -72,9 +72,6 @@
 </div>
 
 <script>
-// =====================================================
-// SMART AGE VALIDATION + PREVENT MIXED INPUT
-// =====================================================
 document.getElementById('registerPatientForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -82,36 +79,8 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
     document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
     document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
 
-    const ageYears = document.getElementById('ageYears');
-    const ageMonths = document.getElementById('ageMonths');
-    const ageDays = document.getElementById('ageDays');
+    // === NO AGE VALIDATION ANYMORE ===
 
-    const hasYears = ageYears.value.trim() !== '';
-    const hasMonths = ageMonths.value.trim() !== '';
-    const hasDays = ageDays.value.trim() !== '';
-
-    // At least one age field must be filled
-    if (!hasYears && !hasMonths && !hasDays) {
-        ageYears.classList.add('is-invalid');
-        const feedback = document.createElement('div');
-        feedback.className = 'invalid-feedback';
-        feedback.textContent = 'Please enter age in years OR months/days.';
-        ageYears.parentNode.appendChild(feedback);
-        ageYears.focus();
-        return;
-    }
-
-    // Prevent mixing years with months/days (optional but recommended for clarity)
-    if (hasYears && (hasMonths || hasDays)) {
-        ageYears.classList.add('is-invalid');
-        const feedback = document.createElement('div');
-        feedback.className = 'invalid-feedback';
-        feedback.textContent = 'Enter either years OR months/days — not both.';
-        ageYears.parentNode.appendChild(feedback);
-        return;
-    }
-
-    // Submit the form
     const formData = new FormData(this);
     const plainData = Object.fromEntries(formData);
 
@@ -126,9 +95,7 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
     })
     .then(response => {
         if (!response.ok) {
-            if (response.status === 422) {
-                return response.json().then(err => { throw err; });
-            }
+            if (response.status === 422) return response.json().then(err => { throw err; });
             return response.text().then(text => { throw new Error(text); });
         }
         return response.json();
@@ -151,12 +118,9 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
                     input.parentNode.appendChild(feedback);
                 }
             });
-
-            const firstError = document.querySelector('.is-invalid');
-            if (firstError) firstError.focus();
+            document.querySelector('.is-invalid')?.focus();
         } else {
-            console.error('Unexpected error:', error);
-            alert('Something went wrong. Check console.');
+            alert(error.message || 'Something went wrong. Please try again.');
         }
     });
 });

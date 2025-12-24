@@ -16,24 +16,27 @@
                         <input type="text" id="edit-name" name="name" class="form-control rounded-3" required>
                     </div>
 
+                    <!-- Age Section - Now Fully Optional & No Restrictions -->
                     <div class="col-12">
-                        <label class="form-label fw-medium">Age <span class="text-danger">*</span></label>
-                        <small class="text-muted d-block mb-2">Enter either Years OR Months & Days</small>
+                        <label class="form-label fw-medium">Age</label>
+                        <small class="text-muted d-block mb-2">
+                            Optional. You may enter years, months, days, or any combination.
+                        </small>
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <input type="number" id="edit-age" name="age" min="0" max="120" 
                                        class="form-control rounded-3" placeholder="Years (e.g. 35)">
-                                <small class="text-muted">For adults</small>
+                                <small class="text-muted">Years</small>
                             </div>
                             <div class="col-md-4">
                                 <input type="number" id="edit-age_months" name="age_months" min="0" max="11" 
-                                       class="form-control rounded-3" placeholder="Months">
-                                <small class="text-muted">For infants</small>
+                                       class="form-control rounded-3" placeholder="Months (0-11)">
+                                <small class="text-muted">Months</small>
                             </div>
                             <div class="col-md-4">
                                 <input type="number" id="edit-age_days" name="age_days" min="0" max="31" 
-                                       class="form-control rounded-3" placeholder="Days">
-                                <small class="text-muted">For newborns</small>
+                                       class="form-control rounded-3" placeholder="Days (0-31)">
+                                <small class="text-muted">Days</small>
                             </div>
                         </div>
                     </div>
@@ -41,6 +44,7 @@
                     <div class="col-md-6">
                         <label class="form-label fw-medium">Gender <span class="text-danger">*</span></label>
                         <select id="edit-gender" name="gender" class="form-select rounded-3" required>
+                            <option value="">Select Gender</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                             <option value="Other">Other</option>
@@ -65,6 +69,7 @@
 </div>
 
 <script>
+// Edit Patient Form Submission - No Age Validation
 document.getElementById('editPatientForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -76,20 +81,7 @@ document.getElementById('editPatientForm').addEventListener('submit', function(e
     const formData = new FormData(this);
     const data = Object.fromEntries(formData);
 
-    // Client-side age validation
-    const hasYears = data.age.trim() !== '';
-    const hasMonths = data.age_months.trim() !== '';
-    const hasDays = data.age_days.trim() !== '';
-
-    if (!hasYears && !hasMonths && !hasDays) {
-        alert('Please enter age in years OR months/days.');
-        return;
-    }
-
-    if (hasYears && (hasMonths || hasDays)) {
-        alert('Enter either years OR months/days — not both.');
-        return;
-    }
+    // === NO AGE VALIDATION AT ALL ===
 
     fetch(`/patients/${patientId}`, {
         method: 'PUT',
@@ -101,29 +93,34 @@ document.getElementById('editPatientForm').addEventListener('submit', function(e
         body: JSON.stringify(data)
     })
     .then(response => {
-        if (!response.ok) throw response;
+        if (!response.ok) {
+            return response.json().then(err => { throw err; });
+        }
         return response.json();
     })
     .then(result => {
         alert(result.message || 'Patient updated successfully!');
         location.reload();
     })
-    .catch(async (err) => {
-        const errorData = await err.json();
-        if (errorData.errors) {
-            Object.keys(errorData.errors).forEach(field => {
+    .catch(error => {
+        if (error.errors) {
+            // Display validation errors
+            Object.keys(error.errors).forEach(field => {
                 const input = document.querySelector(`#edit-${field}`);
                 if (input) {
                     input.classList.add('is-invalid');
                     const feedback = document.createElement('div');
                     feedback.className = 'invalid-feedback';
-                    feedback.textContent = errorData.errors[field][0];
+                    feedback.textContent = error.errors[field][0];
                     input.parentNode.appendChild(feedback);
                 }
             });
-            alert('Please fix the errors.');
+
+            const firstError = document.querySelector('.is-invalid');
+            if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } else {
-            alert('Update failed. Check console.');
+            console.error('Update error:', error);
+            alert(error.message || 'Failed to update patient. Please try again.');
         }
     });
 });
