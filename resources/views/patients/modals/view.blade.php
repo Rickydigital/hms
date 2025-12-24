@@ -54,21 +54,20 @@
                         </div>
                     </div>
                     <div class="col-12">
-                        <div class="d-flex align-items-center gap-3 p-3 
-                            bg-{{ $patient->isExpired() ?? 'success' }} text-white rounded-3">
+                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
                             <i class="bi bi-credit-card-2-front fs-4"></i>
                             <div>
-                                <small>Card Validity</small>
-                                <p id="view-expiry" class="mb-0 fw-bold"></p>
+                                <small class="text-muted">Card Validity</small>
+                                <p id="view-expiry" class="mb-0 fw-medium"></p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer border-0">
+            <div class="modal-footer border-0 justify-content-center">
                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-success rounded-pill px-4" onclick="printCard(event, this.dataset.id)">
-                    <i class="bi bi-printer"></i> Print Card
+                <button type="button" class="btn btn-success rounded-pill px-4" data-id="">
+                    <i class="bi bi-printer me-2"></i> Print Card
                 </button>
             </div>
         </div>
@@ -80,16 +79,21 @@ function showPatient(patient) {
     document.getElementById('view-name').textContent = patient.name;
     document.getElementById('view-id').textContent = patient.patient_id;
 
-    // Smart Age Display
-    let ageText = '';
-    if (patient.age_months || patient.age_days) {
-        const parts = [];
-        if (patient.age_months) parts.push(patient.age_months + ' month' + (patient.age_months > 1 ? 's' : ''));
-        if (patient.age_days) parts.push(patient.age_days + ' day' + (patient.age_days > 1 ? 's' : ''));
-        ageText = parts.length > 0 ? parts.join(' ') : 'Newborn';
-    } else {
-        ageText = (patient.age || 0) + ' yr' + (patient.age > 1 ? 's' : '');
+    // === Smart & Complete Age Display ===
+    const parts = [];
+
+    if (patient.age) {
+        parts.push(patient.age + ' yr' + (patient.age > 1 ? 's' : ''));
     }
+    if (patient.age_months) {
+        parts.push(patient.age_months + ' month' + (patient.age_months > 1 ? 's' : ''));
+    }
+    if (patient.age_days) {
+        parts.push(patient.age_days + ' day' + (patient.age_days > 1 ? 's' : ''));
+    }
+
+    const ageText = parts.length > 0 ? parts.join(' ') : '—';
+
     document.getElementById('view-age-gender').textContent = ageText + ' • ' + patient.gender;
 
     document.getElementById('view-phone').textContent = patient.phone || '—';
@@ -97,7 +101,7 @@ function showPatient(patient) {
     document.getElementById('view-reg-date').textContent = new Date(patient.registration_date).toLocaleDateString('en-GB');
     document.getElementById('view-expiry').textContent = new Date(patient.expiry_date).toLocaleDateString('en-GB');
 
-    // For print button
-    document.querySelector('.modal-footer .btn-success').dataset.id = patient.id;
+    // Set patient ID for print button
+    document.querySelector('#viewPatientModal .btn-success').dataset.id = patient.id;
 }
 </script>
