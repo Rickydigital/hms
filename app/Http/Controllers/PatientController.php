@@ -37,47 +37,116 @@ class PatientController extends Controller
         return view('patients.index', compact('patients'));
     }
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name'    => 'required|string|max:255',
-            'age'     => 'required|integer|min:0|max:120',
-            'gender'  => 'required|in:Male,Female,Other',
-            'phone'   => 'required|string|max:15|unique:patients,phone',
-            'address' => 'nullable|string|max:500',
+
+    // PatientController.php
+
+public function update(Request $request, Patient $patient)
+{
+    $request->validate([
+        'name'        => 'required|string|max:255',
+        'age'         => 'nullable|integer|min:0|max:120',
+        'age_months'  => 'nullable|integer|min:0|max:11',
+        'age_days'    => 'nullable|integer|min:0|max:31',
+        'gender'      => 'required|in:Male,Female,Other',
+        'phone'       => 'required|string|max:15|unique:patients,phone,' . $patient->id,
+        'address'     => 'nullable|string|max:500',
+    ]);
+
+    // At least one age field must be provided
+    if (!$request->filled('age') && !$request->filled('age_months') && !$request->filled('age_days')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Please enter age in years OR months/days.'
+        ], 422);
+    }
+
+    // Prevent mixing years with months/days
+    if ($request->filled('age') && ($request->filled('age_months') || $request->filled('age_days'))) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Enter either years OR months/days — not both.'
+        ], 422);
+    }
+
+    try {
+        $patient->update([
+            'name'        => $request->name,
+            'age'         => $request->filled('age') ? $request->age : null,
+            'age_months'  => $request->age_months,
+            'age_days'    => $request->age_days,
+            'gender'      => $request->gender,
+            'phone'       => $request->phone,
+            'address'     => $request->address,
         ]);
 
-        try {
-            DB::transaction(function () use ($request) {
-                Patient::create([
-                    'patient_id'        => Patient::generatePatientId(),
-                    'name'              => $request->name,
-                    'age'               => $request->age,
-                    'gender'            => $request->gender,
-                    'phone'             => $request->phone,
-                    'address'           => $request->address ?? null,
-                    'registration_date' => now(),
-                    'expiry_date'       => now()->addMonths(
-                        (int) Setting::get('card_validity_months', 12)
-                    ),
-                    'is_active'         => true,
-                ]);
-            });
+        return response()->json([
+            'success' => true,
+            'message' => 'Patient details updated successfully!'
+        ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Patient registered successfully!'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Patient create error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Something went wrong. Please try again.'
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        Log::error('Patient update error: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to update patient.'
+        ], 500);
     }
+}
+
+    // PatientController@store
+
+public function store(Request $request)
+{
+    $request->validate([
+        'name'        => 'required|string|max:255',
+        'age'         => 'nullable|integer|min:0|max:120', // now nullable
+        'age_months'  => 'nullable|integer|min:0|max:11',
+        'age_days'    => 'nullable|integer|min:0|max:31',
+        'gender'      => 'required|in:Male,Female,Other',
+        'phone'       => 'required|string|max:15|unique:patients,phone',
+        'address'     => 'nullable|string|max:500',
+    ]);
+
+    // At least one age field must be provided
+    if (!$request->filled('age') && !$request->filled('age_months') && !$request->filled('age_days')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Please enter age in years OR months/days.'
+        ], 422);
+    }
+
+    try {
+        DB::transaction(function () use ($request) {
+            Patient::create([
+                'patient_id'        => Patient::generatePatientId(),
+                'name'              => $request->name,
+                'age'               => $request->filled('age') ? $request->age : null,
+                'age_months'        => $request->age_months,
+                'age_days'          => $request->age_days,
+                'gender'            => $request->gender,
+                'phone'             => $request->phone,
+                'address'           => $request->address ?? null,
+                'registration_date' => now(),
+                'expiry_date'       => now()->addMonths(
+                    (int) Setting::get('card_validity_months', 12)
+                ),
+                'is_active'         => true,
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Patient registered successfully!'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Patient create error: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Something went wrong. Please try again.'
+        ], 500);
+    }
+}
 
     public function reactivate(Patient $patient)
     {

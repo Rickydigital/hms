@@ -55,7 +55,7 @@
                     </div>
                     <div class="col-12">
                         <div class="d-flex align-items-center gap-3 p-3 
-                            {{ 'bg-' . (request()->patient?->isExpired() ? 'danger' : 'success') }} text-white rounded-3">
+                            bg-{{ $patient->isExpired() ?? 'success' }} text-white rounded-3">
                             <i class="bi bi-credit-card-2-front fs-4"></i>
                             <div>
                                 <small>Card Validity</small>
@@ -67,9 +67,9 @@
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
-                <a href="#" class="btn btn-success rounded-pill px-4" onclick="printCard(event, this.dataset.id)">
+                <button type="button" class="btn btn-success rounded-pill px-4" onclick="printCard(event, this.dataset.id)">
                     <i class="bi bi-printer"></i> Print Card
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -79,11 +79,25 @@
 function showPatient(patient) {
     document.getElementById('view-name').textContent = patient.name;
     document.getElementById('view-id').textContent = patient.patient_id;
-    document.getElementById('view-age-gender').textContent = patient.age + ' yrs • ' + patient.gender;
-    document.getElementById('view-phone').textContent = patient.phone;
+
+    // Smart Age Display
+    let ageText = '';
+    if (patient.age_months || patient.age_days) {
+        const parts = [];
+        if (patient.age_months) parts.push(patient.age_months + ' month' + (patient.age_months > 1 ? 's' : ''));
+        if (patient.age_days) parts.push(patient.age_days + ' day' + (patient.age_days > 1 ? 's' : ''));
+        ageText = parts.length > 0 ? parts.join(' ') : 'Newborn';
+    } else {
+        ageText = (patient.age || 0) + ' yr' + (patient.age > 1 ? 's' : '');
+    }
+    document.getElementById('view-age-gender').textContent = ageText + ' • ' + patient.gender;
+
+    document.getElementById('view-phone').textContent = patient.phone || '—';
     document.getElementById('view-address').textContent = patient.address || '—';
     document.getElementById('view-reg-date').textContent = new Date(patient.registration_date).toLocaleDateString('en-GB');
     document.getElementById('view-expiry').textContent = new Date(patient.expiry_date).toLocaleDateString('en-GB');
-    document.querySelector('[onclick*="printCard"]').dataset.id = patient.id;
+
+    // For print button
+    document.querySelector('.modal-footer .btn-success').dataset.id = patient.id;
 }
 </script>

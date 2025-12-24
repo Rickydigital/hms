@@ -36,6 +36,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/pharmacy/medicines/search', [PharmacySaleController::class, 'search'])
     ->name('pharmacy.medicines.search');
     // Patients
+    Route::put('patients/{patient}', [PatientController::class, 'update'])
+     ->name('patients.update');
     Route::resource('patients', PatientController::class)->only(['index', 'store']);
     Route::post('/patients/{patient}/visit', [VisitController::class, 'store'])->name('patients.visit.store');
     Route::post('patients/{patient}/reactivate', [PatientController::class, 'reactivate'])->name('patients.reactivate');
@@ -51,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/lab/order/{order}/result', [LabController::class, 'storeResult'])->name('lab.result.store');
 
     //pharmacy
+    Route::post('pharmacy/issue-multiple/{visit}', [PharmacyController::class, 'issueMultiple'])->name('pharmacy.issue.multiple');
+    Route::post('pharmacy/handover-multiple/{visit}', [PharmacyController::class, 'handoverMultiple'])->name('pharmacy.handover.multiple');
     Route::get('/pharmacy', [PharmacyController::class, 'index'])->name('pharmacy.index');
     Route::post('/pharmacy/issue/{order}', [PharmacyController::class, 'issue'])->name('pharmacy.issue');
     Route::get('/pharmacy/history', [PharmacyController::class, 'history'])->name('pharmacy.history');

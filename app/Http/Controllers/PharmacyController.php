@@ -21,33 +21,43 @@ class PharmacyController extends Controller
         });
     }
 
-    public function index()
-    {
-        // Pending = Not yet issued
-        $pending = VisitMedicineOrder::with(['visit.patient', 'medicine'])
-            ->where('is_issued', false)
-            ->latest()
-            ->get();
+public function index()
+{
+    // Get all pending (not issued) and ready-for-collection orders
+    $orders = VisitMedicineOrder::with(['visit.patient'])
+        ->with(['medicine' => function ($query) {
+            $query->withSum('batches as total_stock', 'current_stock');
+        }])
+        ->where(function ($q) {
+            $q->where('is_issued', false)
+              ->orWhere(function ($sq) {
+                  $sq->where('is_issued', true)->where('is_paid', false);
+              });
+        })
+        ->latest()
+        ->get();
 
-        // Issued but not paid = Ready for collection after payment
-        $readyForCollection = VisitMedicineOrder::with(['visit.patient', 'medicine', 'issuedBy'])
-            ->where('is_issued', true)
-            ->where('is_paid', false)
-            ->latest()
-            ->get();
+    // Group by visit_id → one entry per patient visit
+    $groupedPending = $orders->groupBy('visit_id');
 
-        // Issued & Paid = Given to patient
-        $givenToday = VisitMedicineOrder::with(['visit.patient', 'medicine', 'issuedBy'])
-            ->where('is_issued', true)
-            ->where('is_paid', true)
-            ->whereDate('paid_at', today())
-            ->latest()
-            ->take(20)
-            ->get();
+    // Given today – also grouped
+    $givenTodayOrders = VisitMedicineOrder::with(['visit.patient'])
+        ->with(['medicine' => function ($query) {
+            $query->withSum('batches as total_stock', 'current_stock');
+        }])
+        ->where('is_issued', true)
+        ->where('is_paid', true)
+        ->whereDate('paid_at', today())
+        ->latest()
+        ->get();
 
-        return view('pharmacy.index', compact('pending', 'readyForCollection', 'givenToday'));
-    }
+    $groupedGivenToday = $givenTodayOrders->groupBy('visit_id');
 
+    return view('pharmacy.index', compact(
+        'groupedPending',
+        'groupedGivenToday'
+    ));
+}
     public function history(Request $request)
     {
         $query = PharmacyIssue::with([
@@ -156,4 +166,49 @@ class PharmacyController extends Controller
 
         return back()->with('success', "Medicine handed over to patient successfully!");
     }
+
+    // PharmacyController.php
+
+public function issueMultiple(Request $request, $visitId)
+{
+    $request->validate([
+        'order_ids' => 'required|array',
+        'order_ids.*' => 'exists:visit_medicine_orders,id',
+        'quantities' => 'required|array',
+    ]);
+
+    $orderIds = $request->order_ids;
+    $quantities = $request->quantities;
+
+    foreach ($orderIds as $orderId) {
+        if (!isset($quantities[$orderId]) || $quantities[$orderId] < 1) continue;
+
+        $order = VisitMedicineOrder::findOrFail($orderId);
+        if ($order->is_issued) continue;
+
+        // Reuse your existing issue logic (or extract to service)
+        // For brevity, calling the single issue method:
+        $request->merge(['quantity_issued' => $quantities[$orderId]]);
+        $this->issue($request, $order);
+    }
+
+    return back()->with('success', 'All selected medicines have been issued.');
+}
+
+public function handoverMultiple($visitId)
+{
+    $orders = VisitMedicineOrder::where('visit_id', $visitId)
+        ->where('is_issued', true)
+        ->where('is_paid', true)
+        ->get();
+
+    foreach ($orders as $order) {
+        $order->update([
+            'handed_over_at' => now(),
+            'handed_over_by' => Auth::id(),
+        ]);
+    }
+
+    return back()->with('success', 'All medicines handed over to patient.');
+}
 }

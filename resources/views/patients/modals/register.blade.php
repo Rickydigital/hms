@@ -8,17 +8,46 @@
             </div>
             <div class="modal-body p-4">
                 <div class="row g-3">
-                    <div class="col-md-8">
+                    <div class="col-md-12">
                         <label class="form-label fw-medium">Full Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control rounded-3" required>
+                        <input type="text" name="name" class="form-control rounded-3" required autofocus>
                     </div>
-                    <div class="col-md-4">
+
+                    <!-- Age Section -->
+                    <div class="col-12">
                         <label class="form-label fw-medium">Age <span class="text-danger">*</span></label>
-                        <input type="number" name="age" min="0" max="120" class="form-control rounded-3" required>
+                        <small class="text-muted d-block mb-2">
+                            Enter either Years OR Months & Days (for infants). At least one field is required.
+                        </small>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <input type="number" name="age" min="0" max="120" 
+                                       class="form-control rounded-3" 
+                                       placeholder="Years (e.g. 35)" 
+                                       id="ageYears">
+                                <small class="text-muted">For adults & children</small>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" name="age_months" min="0" max="11" 
+                                       class="form-control rounded-3" 
+                                       placeholder="Months (0-11)" 
+                                       id="ageMonths">
+                                <small class="text-muted">For infants</small>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" name="age_days" min="0" max="31" 
+                                       class="form-control rounded-3" 
+                                       placeholder="Days (0-31)" 
+                                       id="ageDays">
+                                <small class="text-muted">For newborns</small>
+                            </div>
+                        </div>
                     </div>
+
                     <div class="col-md-6">
                         <label class="form-label fw-medium">Gender <span class="text-danger">*</span></label>
                         <select name="gender" class="form-select rounded-3" required>
+                            <option value="">Select Gender</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                             <option value="Other">Other</option>
@@ -43,7 +72,9 @@
 </div>
 
 <script>
-// FULLY FIXED + SHOWS VALIDATION ERRORS NICELY
+// =====================================================
+// SMART AGE VALIDATION + PREVENT MIXED INPUT
+// =====================================================
 document.getElementById('registerPatientForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -51,6 +82,36 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
     document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
     document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
 
+    const ageYears = document.getElementById('ageYears');
+    const ageMonths = document.getElementById('ageMonths');
+    const ageDays = document.getElementById('ageDays');
+
+    const hasYears = ageYears.value.trim() !== '';
+    const hasMonths = ageMonths.value.trim() !== '';
+    const hasDays = ageDays.value.trim() !== '';
+
+    // At least one age field must be filled
+    if (!hasYears && !hasMonths && !hasDays) {
+        ageYears.classList.add('is-invalid');
+        const feedback = document.createElement('div');
+        feedback.className = 'invalid-feedback';
+        feedback.textContent = 'Please enter age in years OR months/days.';
+        ageYears.parentNode.appendChild(feedback);
+        ageYears.focus();
+        return;
+    }
+
+    // Prevent mixing years with months/days (optional but recommended for clarity)
+    if (hasYears && (hasMonths || hasDays)) {
+        ageYears.classList.add('is-invalid');
+        const feedback = document.createElement('div');
+        feedback.className = 'invalid-feedback';
+        feedback.textContent = 'Enter either years OR months/days — not both.';
+        ageYears.parentNode.appendChild(feedback);
+        return;
+    }
+
+    // Submit the form
     const formData = new FormData(this);
     const plainData = Object.fromEntries(formData);
 
@@ -66,7 +127,7 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
     .then(response => {
         if (!response.ok) {
             if (response.status === 422) {
-                return response.json().then(err => { throw err; }); // Laravel validation error
+                return response.json().then(err => { throw err; });
             }
             return response.text().then(text => { throw new Error(text); });
         }
@@ -79,26 +140,20 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
         }
     })
     .catch(error => {
-        // === HANDLE LARAVEL VALIDATION ERRORS BEAUTIFULLY ===
         if (error.errors) {
             Object.keys(error.errors).forEach(field => {
                 const input = document.querySelector(`[name="${field}"]`);
                 if (input) {
                     input.classList.add('is-invalid');
-
                     const feedback = document.createElement('div');
                     feedback.className = 'invalid-feedback';
-                    feedback.textContent = error.errors[field][0]; // First error message
+                    feedback.textContent = error.errors[field][0];
                     input.parentNode.appendChild(feedback);
                 }
             });
 
-            // Auto-focus first invalid field
             const firstError = document.querySelector('.is-invalid');
             if (firstError) firstError.focus();
-
-            // Optional: Show toast or sweet alert
-            alert('Please fix the errors below');
         } else {
             console.error('Unexpected error:', error);
             alert('Something went wrong. Check console.');

@@ -100,36 +100,41 @@
         <div class="col-lg-4">
             <div class="sticky-top" style="top: 20px;">
 
-                <!-- Search Patient -->
+                <!-- Live Search Patient (Like Pharmacy) -->
                 <div class="card mb-4">
                     <div class="card-header bg-gradient-primary text-white rounded-top">
-                        <h5 class="mb-0">Search Patient</h5>
+                        <h5 class="mb-0">Search Patient in Queue</h5>
                     </div>
                     <div class="card-body p-4">
-                        <form action="{{ route('doctor.opd') }}" method="GET">
-                            <div class="input-group input-group-lg">
-                                <input type="text" name="patient_id" class="form-control" 
-                                       placeholder="CWH2025-000001" value="{{ request('patient_id') }}" required autofocus>
-                                <button class="btn btn-primary btn-lg">Go</button>
-                            </div>
-                        </form>
+                        <input type="text" id="queueSearchInput" class="form-control form-control-lg" 
+                               placeholder="Search by Name or ID..." autocomplete="off">
+                        <small class="text-muted d-block mt-2">Filters today's queue instantly</small>
                     </div>
                 </div>
 
-                <!-- Today's Queue -->
+                <!-- Todays Queue -->
                 <div class="card">
                     <div class="card-header bg-success text-white d-flex justify-content-between align-items-center rounded-top">
                         <h5 class="mb-0">Today's Queue <span class="badge bg-light text-success ms-2">{{ $todayVisits->count() }}</span></h5>
                         <small>{{ now()->format('d M Y') }}</small>
                     </div>
-                    <div class="list-group list-group-flush" style="max-height: 70vh; overflow-y: auto;">
+                    <div class="list-group list-group-flush" style="max-height: 70vh; overflow-y: auto;" id="queueList">
                         @forelse($todayVisits as $v)
                             <a href="{{ route('doctor.opd.show', $v) }}" 
-                               class="list-group-item list-group-item-action px-4 py-3 {{ $visit && $visit->id == $v->id ? 'bg-primary text-white' : '' }}">
+                               class="list-group-item list-group-item-action px-4 py-3 queue-item {{ $visit && $visit->id == $v->id ? 'bg-primary text-white' : '' }}"
+                               data-patient-name="{{ strtolower($v->patient->name) }}"
+                               data-patient-id="{{ strtolower($v->patient->patient_id) }}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <strong>{{ $v->patient->patient_id }}</strong> • {{ $v->visit_time->format('h:i A') }}<br>
-                                        <b>{{ $v->patient->name }}</b> • {{ $v->patient->age }} yrs
+                                        <b>{{ $v->patient->name }}</b> • 
+                                        @if($v->patient->age_months || $v->patient->age_days)
+                                            {{ $v->patient->age ?? '—' }} yrs 
+                                            {{ $v->patient->age_months ? $v->patient->age_months . 'm' : '' }}
+                                            {{ $v->patient->age_days ? $v->patient->age_days . 'd' : '' }} 
+                                        @else
+                                            {{ $v->patient->age ?? '—' }} yrs
+                                        @endif
                                     </div>
                                     <span class="badge bg-{{ $v->status == 'consulting' ? 'warning' : ($v->status == 'sent_to_lab' ? 'info' : 'primary') }}">
                                         {{ ucfirst(str_replace('_', ' ', $v->status)) }}
@@ -476,6 +481,22 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    const queueSearchInput = document.getElementById('queueSearchInput');
+    const queueItems = document.querySelectorAll('.queue-item');
+
+    queueSearchInput.addEventListener('input', function () {
+        const query = this.value.toLowerCase().trim();
+
+        queueItems.forEach(item => {
+            const name = item.dataset.patientName;
+            const id = item.dataset.patientId;
+
+            const matches = name.includes(query) || id.includes(query);
+            item.style.display = matches ? '' : 'none';
+        });
+    });
+
     const form = document.getElementById('prescriptionForm');
     if (!form) return;
 

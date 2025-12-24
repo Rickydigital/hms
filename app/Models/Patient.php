@@ -10,28 +10,50 @@ class Patient extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'patient_id',
-        'name',
-        'age',
-        'gender',
-        'phone',
-        'address',
-        'registration_date',
-        'expiry_date',
-        'is_active',
-        'reactivation_fee_paid',
-        'total_visits',
-    ];
+// App\Models\Patient.php
 
-    // THIS IS THE ONLY CORRECT WAY IN LARAVEL 11
-    protected $casts = [
-        'registration_date'     => 'datetime:Y-m-d',
-        'expiry_date'           => 'datetime:Y-m-d',
-        'is_active'             => 'boolean',
-        'reactivation_fee_paid' => 'string',   // ← CHANGED FROM 'decimal:2' TO 'string'
-        'total_visits'          => 'integer',
-    ];
+protected $fillable = [
+    'patient_id',
+    'name',
+    'age',
+    'age_months',     // ← added
+    'age_days',       // ← added
+    'gender',
+    'phone',
+    'address',
+    'registration_date',
+    'expiry_date',
+    'is_active',
+    'reactivation_fee_paid',
+    'total_visits',
+];
+
+protected $casts = [
+    'registration_date'     => 'datetime:Y-m-d',
+    'expiry_date'           => 'datetime:Y-m-d',
+    'is_active'             => 'boolean',
+    'reactivation_fee_paid' => 'string',
+    'total_visits'          => 'integer',
+    'age_months'            => 'integer',
+    'age_days'              => 'integer',
+];
+
+// Smart age display
+public function getAgeDisplayAttribute(): string
+{
+    if ($this->age_months !== null || $this->age_days !== null) {
+        $parts = [];
+        if ($this->age_months !== null) {
+            $parts[] = $this->age_months . ' month' . ($this->age_months != 1 ? 's' : '');
+        }
+        if ($this->age_days !== null) {
+            $parts[] = $this->age_days . ' day' . ($this->age_days != 1 ? 's' : '');
+        }
+        return implode(' ', $parts) ?: 'Newborn';
+    }
+
+    return $this->age . ' yr' . ($this->age != 1 ? 's' : '');
+}
 
     // Auto generate Patient ID
     public static function generatePatientId(): string

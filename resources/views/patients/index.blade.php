@@ -6,9 +6,7 @@
     <!-- Header -->
     <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
         <div>
-            <h4 class="mb-1 text-primary fw-bold">
-                Patients
-            </h4>
+            <h4 class="mb-1 text-primary fw-bold">Patients</h4>
             <p class="text-muted mb-0 small">Search, register & manage all patients</p>
         </div>
         <button type="button" class="btn btn-primary d-none d-sm-flex align-items-center shadow-sm"
@@ -27,31 +25,23 @@
         </div>
     </div>
 
-    <!-- Search Bar -->
+    <!-- Live Search Bar (Like Pharmacy) -->
     <div class="card border-0 shadow-sm rounded-4 mb-4">
         <div class="card-body p-4">
-            <form action="{{ route('patients.index') }}" method="GET">
-                <div class="input-group input-group-lg">
-                    <span class="input-group-text bg-white border-end-0">
-                        Search
-                    </span>
-                    <input type="text" name="search" value="{{ request('search') }}" 
-                           class="form-control border-start-0 rounded-end-3" 
-                           placeholder="Search by ID, Name or Phone..." autofocus>
-                    @if(request('search'))
-                        <a href="{{ route('patients.index') }}" class="btn btn-outline-secondary rounded-start-0">
-                            Clear
-                        </a>
-                    @endif
-                </div>
-            </form>
+            <div class="input-group input-group-lg">
+                <span class="input-group-text bg-white border-end-0">Search</span>
+                <input type="text" id="patientSearchInput" class="form-control border-start-0 rounded-end-3" 
+                       placeholder="Search by Patient Name or ID..." autocomplete="off">
+            </div>
         </div>
     </div>
 
     <!-- Patients Grid -->
-    <div class="row g-3 g-md-4">
+    <div class="row g-3 g-md-4" id="patientsGrid">
         @forelse($patients as $patient)
-            <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+            <div class="col-12 col-sm-6 col-lg-4 col-xl-3 patient-card"
+                 data-patient-name="{{ strtolower($patient->name) }}"
+                 data-patient-id="{{ strtolower($patient->patient_id) }}">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden position-relative hover-lift">
                     <div class="position-absolute top-0 start-0 p-2 z-3">
                         @if($patient->isExpired())
@@ -69,14 +59,30 @@
                         </div>
 
                         <h5 class="card-title mb-1 fw-bold">{{ $patient->name }}</h5>
-                        <p class="text-muted small mb-2">Age: {{ $patient->age }} yrs</p>
+                        <p class="text-muted small mb-2">
+                            Age: 
+                            @if($patient->age_months || $patient->age_days)
+                                {{ $patient->age_months ? $patient->age_months . ' months' : '' }}
+                                {{ $patient->age_days ? $patient->age_days . ' days' : '' }}
+                            @else
+                                {{ $patient->age ?? '—' }} yrs
+                            @endif
+                        </p>
                         <p class="text-primary small fw-bold mb-3">{{ $patient->patient_id }}</p>
 
-                        <div class="d-flex gap-2 justify-content-center mt-auto">
+                        <!-- Buttons Section -->
+                        <div class="d-flex gap-2 justify-content-center mt-auto flex-wrap">
                             <button type="button" class="btn btn-outline-info btn-sm rounded-pill"
                                     data-bs-toggle="modal" data-bs-target="#viewPatientModal"
-                                    onclick='showPatient({!! json_encode($patient) !!})'>
+                                    onclick='showPatient({!! json_encode($patient->append(['age_display'])) !!})'>
                                 View
+                            </button>
+
+                            <!-- Edit Button -->
+                            <button type="button" class="btn btn-outline-warning btn-sm rounded-pill"
+                                    data-bs-toggle="modal" data-bs-target="#editPatientModal"
+                                    onclick='openEditModal({!! json_encode($patient) !!})'>
+                                <i class="bi bi-pencil"></i> Edit
                             </button>
 
                             @if($patient->is_active && !$patient->isExpired())
@@ -127,6 +133,7 @@
 @include('patients.modals.register')
 @include('patients.modals.view')
 @include('patients.modals.visit')
+@include('patients.modals.edit')
 
 <style>
 .hover-lift { transition: all .3s cubic-bezier(.34,1.56,.64,1); }
@@ -136,9 +143,25 @@
 </style>
 
 <script>
-// ==========================================
-// FIXED & BULLETPROOF REACTIVATE FUNCTION
-// ==========================================
+// Live Search - Exactly like Pharmacy
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('patientSearchInput');
+    const patientCards = document.querySelectorAll('.patient-card');
+
+    searchInput.addEventListener('input', function () {
+        const query = this.value.toLowerCase().trim();
+
+        patientCards.forEach(card => {
+            const name = card.dataset.patientName;
+            const id = card.dataset.patientId;
+
+            const matches = name.includes(query) || id.includes(query);
+            card.style.display = matches ? '' : 'none';
+        });
+    });
+});
+
+// Reactivate Patient
 function reactivatePatient(id) {
     if (!confirm('Reactivate this patient card?')) return;
 
@@ -146,24 +169,27 @@ function reactivatePatient(id) {
         method: 'POST',
         headers: {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Accept': 'application/json'
         }
     })
-    .then(response => {
-        if (!response.ok) {
-            return response.text().then(text => { throw new Error(text); });
-        }
-        return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
         alert(data.message || 'Patient reactivated!');
         location.reload();
     })
-    .catch(err => {
-        console.error(err);
-        alert('Failed to reactivate. Check console.');
-    });
+    .catch(() => alert('Failed to reactivate.'));
+}
+
+// Open Edit Modal with Pre-filled Data
+function openEditModal(patient) {
+    document.getElementById('editPatientId').value = patient.id;
+    document.getElementById('edit-name').value = patient.name;
+    document.getElementById('edit-age').value = patient.age || '';
+    document.getElementById('edit-age_months').value = patient.age_months || '';
+    document.getElementById('edit-age_days').value = patient.age_days || '';
+    document.getElementById('edit-gender').value = patient.gender;
+    document.getElementById('edit-phone').value = patient.phone;
+    document.getElementById('edit-address').value = patient.address || '';
 }
 </script>
 @endsection
