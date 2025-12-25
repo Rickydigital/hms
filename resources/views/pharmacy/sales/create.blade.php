@@ -165,7 +165,6 @@
         background-color: #fdf0f0;
     }
 </style>
-
 <script>
 let itemIndex = 0;
 
@@ -173,7 +172,7 @@ function addNewRow() {
     const template = document.getElementById('itemTemplate').content.cloneNode(true);
     const row = template.querySelector('.item-row');
 
-    // Update name indices
+    // Update input names
     row.querySelectorAll('[name*="items"]').forEach(el => {
         el.name = el.name.replace('[0]', '[' + itemIndex + ']');
     });
@@ -195,44 +194,61 @@ function addNewRow() {
         width: '100%'
     });
 
-    // On change
-    select.addEventListener('change', function() {
-        const option = this.options[this.selectedIndex];
-        if (!option.value) {
+    // Handle selection/clear
+    $(select).on('select2:select select2:clear', function () {
+        const selectedOption = select.options[select.selectedIndex];
+
+        if (!select.value || !selectedOption) {
             priceDisplay.value = '';
+            stockInfo.textContent = '';
             stockInfo.classList.add('d-none');
             lineTotal.textContent = '0';
             qtyInput.removeAttribute('max');
+            qtyInput.value = 1;
+
+            delete select.dataset.price;
+            delete select.dataset.stock;
+
+            qtyWarning.style.display = 'none';
+            row.classList.remove('border-danger');
+            updateTotals();
             return;
         }
 
-        const price = parseFloat(option.dataset.price || 0);
-        const stock = parseInt(option.dataset.stock || 0);
+        const price = parseFloat(selectedOption.dataset.price || 0);
+        const stock = parseInt(selectedOption.dataset.stock || 0);
 
-        priceDisplay.value = price.toLocaleString('en-TZ');
+        select.dataset.price = price;
+        select.dataset.stock = stock;
+
+        priceDisplay.value = price.toLocaleString('en-TZ', { minimumFractionDigits: 0 });
         stockInfo.textContent = `Available Stock: ${stock}`;
         stockInfo.classList.remove('d-none');
-        stockInfo.classList.toggle('text-success', stock > 5);
-        stockInfo.classList.toggle('text-warning', stock <= 5 && stock > 0);
+        stockInfo.classList.toggle('text-success', stock > 10);
+        stockInfo.classList.toggle('text-warning', stock <= 10 && stock > 0);
+        stockInfo.classList.toggle('text-danger', stock === 0);
 
         qtyInput.max = stock;
-        if (parseInt(qtyInput.value) > stock) qtyInput.value = stock;
+        // Do NOT auto-reduce qty here unless > stock
+        if (parseInt(qtyInput.value) > stock) {
+            qtyInput.value = stock > 0 ? stock : 1;
+        }
 
-        validateQuantity();
+        validateRowQuantity(); // Only validate this row
         updateTotals();
     });
 
+    // Quantity change
     qtyInput.addEventListener('input', () => {
-        validateQuantity();
+        validateRowQuantity();
         updateTotals();
     });
 
-    function validateQuantity() {
-        const selectedOption = select.options[select.selectedIndex];
+    function validateRowQuantity() {
         const qty = parseInt(qtyInput.value) || 0;
-        const stock = selectedOption ? parseInt(selectedOption.dataset.stock || 0) : 0;
+        const stock = select.dataset.stock ? parseInt(select.dataset.stock) : 0;
 
-        if (selectedOption && qty > stock) {
+        if (select.value && qty > stock && stock >= 0) {
             qtyWarning.textContent = `Only ${stock} in stock!`;
             qtyWarning.style.display = 'block';
             row.classList.add('border-danger');
@@ -240,59 +256,66 @@ function addNewRow() {
             qtyWarning.style.display = 'none';
             row.classList.remove('border-danger');
         }
-        toggleSubmitButton();
     }
 
+    // Remove row
     row.querySelector('.remove-item').addEventListener('click', () => {
+        $(select).select2('destroy');
         row.remove();
         updateTotals();
-        toggleSubmitButton();
     });
 
-    updateTotals();
+    updateTotals(); // Initial
 }
 
 function updateTotals() {
     let grandTotal = 0;
-    let hasError = false;
+    let hasStockError = false;
 
     document.querySelectorAll('.item-row').forEach(row => {
         const select = row.querySelector('.medicine-select');
-        const option = select.options[select.selectedIndex];
-        const qty = parseInt(row.querySelector('.qty-input').value) || 0;
-        const price = option ? parseFloat(option.dataset.price || 0) : 0;
-        const lineTotalValue = qty * price;
+        const qtyInput = row.querySelector('.qty-input');
+        const lineTotalSpan = row.querySelector('.line-total');
 
-        row.querySelector('.line-total').textContent = lineTotalValue.toLocaleString('en-TZ');
-        grandTotal += lineTotalValue;
+        const qty = parseInt(qtyInput.value) || 0;
+        const price = select.dataset.price ? parseFloat(select.dataset.price) : 0;
+        const stock = select.dataset.stock ? parseInt(select.dataset.stock) : 0;
 
-        if (option && qty > parseInt(option.dataset.stock || 0)) {
-            hasError = true;
+        const lineValue = qty * price;
+        lineTotalSpan.textContent = lineValue.toLocaleString('en-TZ', { minimumFractionDigits: 0 });
+        grandTotal += lineValue;
+
+        // Only error if qty > stock
+        if (select.value && qty > stock) {
+            hasStockError = true;
         }
     });
 
-    document.getElementById('grandTotal').textContent = grandTotal.toLocaleString('en-TZ');
+    document.getElementById('grandTotal').textContent = grandTotal.toLocaleString('en-TZ', { minimumFractionDigits: 0 });
     document.getElementById('amountPaid').value = grandTotal;
     calculateChange();
-    toggleSubmitButton(hasError);
+    toggleSubmitButton(hasStockError);
 }
 
-function toggleSubmitButton(hasError = false) {
+function toggleSubmitButton(hasStockError = false) {
     const rows = document.querySelectorAll('.item-row');
     const hasItems = rows.length > 0;
-    const hasSelection = Array.from(rows).some(r => r.querySelector('.medicine-select').value);
+    const hasSelection = Array.from(rows).some(row => row.querySelector('.medicine-select').value);
 
     const submitBtn = document.getElementById('submitBtn');
-    const disabled = hasError || !hasItems || !hasSelection;
+    const disabled = hasStockError || !hasItems || !hasSelection;
 
     submitBtn.disabled = disabled;
 
     if (disabled) {
         submitBtn.classList.remove('btn-teal');
         submitBtn.classList.add('btn-secondary');
-        submitBtn.innerHTML = hasError
-            ? '<i class="bi bi-exclamation-triangle"></i> Insufficient stock in one or more items'
-            : '<i class="bi bi-cart"></i> Please add items to proceed';
+
+        if (hasStockError) {
+            submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Fix insufficient stock';
+        } else {
+            submitBtn.innerHTML = '<i class="bi bi-cart"></i> Please add items to proceed';
+        }
     } else {
         submitBtn.classList.remove('btn-secondary');
         submitBtn.classList.add('btn-teal');
@@ -301,10 +324,11 @@ function toggleSubmitButton(hasError = false) {
 }
 
 function calculateChange() {
-    const total = parseFloat(document.getElementById('grandTotal').textContent.replace(/,/g, '')) || 0;
+    const totalText = document.getElementById('grandTotal').textContent.replace(/,/g, '');
+    const total = parseFloat(totalText) || 0;
     const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
     const change = paid >= total ? paid - total : 0;
-    document.getElementById('changeDue').textContent = change.toLocaleString('en-TZ');
+    document.getElementById('changeDue').textContent = change.toLocaleString('en-TZ', { minimumFractionDigits: 0 });
 }
 
 $(document).ready(function() {
