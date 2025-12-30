@@ -148,80 +148,84 @@
             </div>
 
             <!-- RIGHT: Given to Patients Today -->
-            <div class="col-lg-4">
-                <div class="card border-0 shadow rounded-4 h-100">
-                    <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h5 class="mb-0 fw-bold">
-                                    Given to Patients Today
-                                    <span class="badge bg-light text-success ms-3">
-                                        {{ $groupedGivenToday->count() }} patient{{ $groupedGivenToday->count() != 1 ? 's' : '' }}
-                                    </span>
-                                </h5>
-                            </div>
-                            <div class="col-auto">
-                                <input type="text" id="givenSearchInput" class="form-control form-control-sm" 
-                                       placeholder="Search patient..." autocomplete="off">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body p-0" style="max-height: 78vh; overflow-y: auto;">
-                        <div id="givenList">
-                            @forelse($groupedGivenToday as $visitId => $orders)
-                                @php 
-                                    $visit = $orders->first()->visit;
-                                    $patient = $visit->patient;
-                                    $handoverTime = $orders->first()->handed_over_at ?? $orders->first()->paid_at;
-                                @endphp
-                                <div class="given-item p-4 border-bottom hover-bg-light"
-                                     data-patient-name="{{ strtolower($patient->name) }}"
-                                     data-patient-id="{{ strtolower($patient->patient_id) }}">
-                                    <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-light">
-                                        <div>
-                                            <h6 class="fw-bold text-success mb-1">
-                                                {{ $patient->name }}
-                                                <span class="text-secondary fs-6">({{ $patient->patient_id }})</span>
-                                            </h6>
-                                            <small class="text-muted">
-                                                Handed over at {{ $handoverTime->format('h:i A') }}
-                                                <span class="badge bg-success ms-2">
-                                                    {{ $orders->count() }} item{{ $orders->count() > 1 ? 's' : '' }}
-                                                </span>
-                                            </small>
-                                        </div>
-                                        <i class="bi bi-check-circle-fill text-success fs-2"></i>
-                                    </div>
-
-                                    <div class="mt-3">
-                                        @foreach($orders as $order)
-                                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                                <div class="flex-grow-1">
-                                                    <div class="fw-bold text-dark">{{ $order->medicine->medicine_name }}</div>
-                                                    <div class="text-muted small">
-                                                        {{ $order->dosage }} × {{ $order->duration_days }} days
-                                                        @if($order->instruction)
-                                                            <span class="text-success">• {{ $order->instruction }}</span>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div class="text-end ms-3">
-                                                    <span class="badge bg-success fs-6">Qty: {{ $order->quantity_issued }}</span>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="text-center py-5 text-muted">
-                                    <i class="bi bi-people-fill display-4 opacity-50"></i>
-                                    <p class="mt-3">No medicines handed over yet today</p>
-                                </div>
-                            @endforelse
-                        </div>
-                    </div>
+            <!-- RIGHT: Given to Patients Today -->
+<div class="col-lg-4">
+    <div class="card border-0 shadow rounded-4 h-100">
+        <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h5 class="mb-0 fw-bold">
+                        Given to Patients Today
+                        <span class="badge bg-light text-success ms-3">
+                            {{ $groupedGivenToday->count() }} patient{{ $groupedGivenToday->count() != 1 ? 's' : '' }}
+                        </span>
+                    </h5>
+                </div>
+                <div class="col-auto">
+                    <input type="text" id="givenSearchInput" class="form-control form-control-sm" 
+                           placeholder="Search patient..." autocomplete="off">
                 </div>
             </div>
+        </div>
+        <div class="card-body p-0" style="max-height: 78vh; overflow-y: auto;">
+            <div id="givenList">
+                @forelse($groupedGivenToday as $visitId => $orders)
+                    @php 
+                        $visit = $orders->first()->visit;
+                        $patient = $visit->patient;
+                        $handoverTime = $orders->first()->handed_over_at ?? $orders->first()->paid_at;
+                    @endphp
+                    <div class="given-item p-4 border-bottom hover-bg-light"
+                         data-patient-name="{{ strtolower($patient->name) }}"
+                         data-patient-id="{{ strtolower($patient->patient_id) }}">
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-light">
+                            <div>
+                                <h6 class="fw-bold text-success mb-1">
+                                    {{ $patient->name }}
+                                    <span class="text-secondary fs-6">({{ $patient->patient_id }})</span>
+                                </h6>
+                                <small class="text-muted">
+                                    Handed over at {{ $handoverTime->format('h:i A') }}
+                                    <span class="badge bg-success ms-2">
+                                        {{ $orders->count() }} item{{ $orders->count() > 1 ? 's' : '' }}
+                                    </span>
+                                </small>
+                            </div>
+                            <i class="bi bi-check-circle-fill text-success fs-2"></i>
+                        </div>
+
+                        <!-- Updated medicines list with quantity issued -->
+                        <div class="mt-3">
+                            @foreach($orders as $order)
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-dark">{{ $order->medicine->medicine_name }}</div>
+                                        <div class="text-muted small">
+                                            {{ $order->dosage }} × {{ $order->duration_days }} days
+                                            @if($order->instruction)
+                                                <span class="text-success">• {{ $order->instruction }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="text-end ms-3">
+                                        <span class="badge bg-success fs-6">
+                                            Qty: {{ $order->quantity_issued ?? 1 }}
+                                        </span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @empty
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-people-fill display-4 opacity-50"></i>
+                        <p class="mt-3">No medicines handed over yet today</p>
+                    </div>
+                @endforelse
+            </div>
+        </div>
+    </div>
+</div>
         </div>
     </div>
 </div>
