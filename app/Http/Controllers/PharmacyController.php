@@ -206,13 +206,7 @@ public function deleteOrder(VisitMedicineOrder $order)
         ], 403);
     }
 
-    // Optional: Add permission check
-    if (!Auth::user()->can('delete prescription')) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized.'
-        ], 403);
-    }
+    
 
     $medicineName = $order->medicine->medicine_name;
 
