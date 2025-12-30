@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/lab/order/{order}/result', [LabController::class, 'storeResult'])->name('lab.result.store');
 
     //pharmacy
+    Route::delete('/pharmacy/order/{order}', [PharmacyController::class, 'deleteOrder'])->name('pharmacy.order.delete');
     Route::post('pharmacy/issue-multiple/{visit}', [PharmacyController::class, 'issueMultiple'])->name('pharmacy.issue.multiple');
     Route::post('pharmacy/handover-multiple/{visit}', [PharmacyController::class, 'handoverMultiple'])->name('pharmacy.handover.multiple');
     Route::get('/pharmacy', [PharmacyController::class, 'index'])->name('pharmacy.index');

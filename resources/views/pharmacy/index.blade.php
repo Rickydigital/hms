@@ -51,7 +51,6 @@
                                 @php
                                     $visit = $orders->first()->visit;
                                     $patient = $visit->patient;
-                                    // Use total_stock (same as OTC) for checking if any medicine can be issued
                                     $canIssueAny = $orders->where('is_issued', false)
                                                           ->where(fn($o) => ($o->medicine->total_stock ?? 0) >= 1)
                                                           ->count() > 0;
@@ -89,7 +88,7 @@
                                         @foreach($orders as $order)
                                             @php
                                                 $m = $order->medicine;
-                                                $stock = $m->total_stock ?? 0; // ← Exactly like OTC
+                                                $stock = $m->total_stock ?? 0;
                                             @endphp
                                             <div class="d-flex justify-content-between align-items-center py-2">
                                                 <div>
@@ -148,86 +147,81 @@
                 </div>
             </div>
 
-            <!-- RIGHT: Given to Patients Today (Grouped & Enhanced) -->
-<div class="col-lg-4">
-    <div class="card border-0 shadow rounded-4 h-100">
-        <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
-            <div class="row align-items-center">
-                <div class="col">
-                    <h5 class="mb-0 fw-bold">
-                        Given to Patients Today
-                        <span class="badge bg-light text-success ms-3">
-                            {{ $groupedGivenToday->count() }} patient{{ $groupedGivenToday->count() != 1 ? 's' : '' }}
-                        </span>
-                        
-                    </h5>
-                </div>
-                <div class="col-auto">
-                    <input type="text" id="givenSearchInput" class="form-control form-control-sm" 
-                           placeholder="Search patient..." autocomplete="off">
-                </div>
-            </div>
-        </div>
-        <div class="card-body p-0" style="max-height: 78vh; overflow-y: auto;">
-            <div id="givenList">
-                @forelse($groupedGivenToday as $visitId => $orders)
-                    @php 
-                        $visit = $orders->first()->visit;
-                        $patient = $visit->patient;
-                        $totalQty = $orders->sum('quantity_issued');
-                        $handoverTime = $orders->first()->handed_over_at ?? $orders->first()->paid_at;
-                    @endphp
-                    <div class="given-item p-4 border-bottom hover-bg-light"
-                         data-patient-name="{{ strtolower($patient->name) }}"
-                         data-patient-id="{{ strtolower($patient->patient_id) }}">
-                        <!-- Patient Header -->
-                        <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-light">
-                            <div>
-                                <h6 class="fw-bold text-success mb-1">
-                                    {{ $patient->name }}
-                                    <span class="text-secondary fs-6">({{ $patient->patient_id }})</span>
-                                </h6>
-                                <small class="text-muted">
-                                    Handed over at {{ $handoverTime->format('h:i A') }}
-                                    <span class="badge bg-success ms-2">
-                                        {{ $orders->count() }} item{{ $orders->count() > 1 ? 's' : '' }}
+            <!-- RIGHT: Given to Patients Today -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow rounded-4 h-100">
+                    <div class="card-header text-white py-4" style="background: linear-gradient(90deg, #0d9488, #0f766e);">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h5 class="mb-0 fw-bold">
+                                    Given to Patients Today
+                                    <span class="badge bg-light text-success ms-3">
+                                        {{ $groupedGivenToday->count() }} patient{{ $groupedGivenToday->count() != 1 ? 's' : '' }}
                                     </span>
-                                    
-                                </small>
+                                </h5>
                             </div>
-                            <i class="bi bi-check-circle-fill text-success fs-2"></i>
+                            <div class="col-auto">
+                                <input type="text" id="givenSearchInput" class="form-control form-control-sm" 
+                                       placeholder="Search patient..." autocomplete="off">
+                            </div>
                         </div>
-
-                        <!-- Medicines List -->
-                        <div class="mt-3">
-                            @foreach($orders as $order)
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-dark">{{ $order->medicine->medicine_name }}</div>
-                                        <div class="text-muted small">
-                                            {{ $order->dosage }} × {{ $order->duration_days }} days
-                                            @if($order->instruction)
-                                                <span class="text-success">• {{ $order->instruction }}</span>
-                                            @endif
+                    </div>
+                    <div class="card-body p-0" style="max-height: 78vh; overflow-y: auto;">
+                        <div id="givenList">
+                            @forelse($groupedGivenToday as $visitId => $orders)
+                                @php 
+                                    $visit = $orders->first()->visit;
+                                    $patient = $visit->patient;
+                                    $handoverTime = $orders->first()->handed_over_at ?? $orders->first()->paid_at;
+                                @endphp
+                                <div class="given-item p-4 border-bottom hover-bg-light"
+                                     data-patient-name="{{ strtolower($patient->name) }}"
+                                     data-patient-id="{{ strtolower($patient->patient_id) }}">
+                                    <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-light">
+                                        <div>
+                                            <h6 class="fw-bold text-success mb-1">
+                                                {{ $patient->name }}
+                                                <span class="text-secondary fs-6">({{ $patient->patient_id }})</span>
+                                            </h6>
+                                            <small class="text-muted">
+                                                Handed over at {{ $handoverTime->format('h:i A') }}
+                                                <span class="badge bg-success ms-2">
+                                                    {{ $orders->count() }} item{{ $orders->count() > 1 ? 's' : '' }}
+                                                </span>
+                                            </small>
                                         </div>
+                                        <i class="bi bi-check-circle-fill text-success fs-2"></i>
                                     </div>
-                                    <div class="text-end ms-3">
-                                        <span class="badge bg-success fs-6">Qty: {{ $order->quantity_issued }}</span>
+
+                                    <div class="mt-3">
+                                        @foreach($orders as $order)
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-bold text-dark">{{ $order->medicine->medicine_name }}</div>
+                                                    <div class="text-muted small">
+                                                        {{ $order->dosage }} × {{ $order->duration_days }} days
+                                                        @if($order->instruction)
+                                                            <span class="text-success">• {{ $order->instruction }}</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div class="text-end ms-3">
+                                                    <span class="badge bg-success fs-6">Qty: {{ $order->quantity_issued }}</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
                                     </div>
                                 </div>
-                            @endforeach
+                            @empty
+                                <div class="text-center py-5 text-muted">
+                                    <i class="bi bi-people-fill display-4 opacity-50"></i>
+                                    <p class="mt-3">No medicines handed over yet today</p>
+                                </div>
+                            @endforelse
                         </div>
                     </div>
-                @empty
-                    <div class="text-center py-5 text-muted">
-                        <i class="bi bi-people-fill display-4 opacity-50"></i>
-                        <p class="mt-3">No medicines handed over yet today</p>
-                    </div>
-                @endforelse
+                </div>
             </div>
-        </div>
-    </div>
-</div>
         </div>
     </div>
 </div>
@@ -243,7 +237,7 @@
             <form id="multiIssueForm" method="POST">
                 @csrf
                 <div class="modal-body" id="modalMedicinesList">
-                    <!-- Medicines will be injected here via JS -->
+                    <!-- Medicines injected via JS -->
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-lg" data-bs-dismiss="modal">Cancel</button>
@@ -260,6 +254,16 @@
     .btn-success { background: linear-gradient(90deg, #0d9488, #0f766e); border: none; }
     .btn-success:hover { background: linear-gradient(90deg, #0a6d63, #0b574f); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(13,148,136,0.4); }
     .text-teal { color: #0d9488 !important; }
+
+    .remove-medicine {
+        opacity: 0.7;
+        transition: all 0.2s;
+    }
+    .remove-medicine:hover {
+        opacity: 1;
+        background-color: #dc3545 !important;
+        color: white !important;
+    }
 </style>
 
 <script>
@@ -286,7 +290,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Store all pending orders globally for modal
     window.pendingOrders = @json($groupedPending->flatten());
 
     const modal = document.getElementById('issueModal');
@@ -329,9 +332,15 @@ document.addEventListener('DOMContentLoaded', function () {
         visitOrders.forEach(order => {
             const stock = order.medicine.total_stock || 0;
             const price = order.medicine.price;
+
             html += `
-                <tr class="medicine-row">
-                    <td><strong>${order.medicine.medicine_name}</strong></td>
+                <tr class="medicine-row" data-order-id="${order.id}">
+                    <td>
+                        <strong>${order.medicine.medicine_name}</strong>
+                        <button type="button" class="btn btn-sm btn-outline-danger float-end remove-medicine" title="Permanently delete from prescription">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
                     <td>
                         ${order.dosage} × ${order.duration_days} days
                         ${order.instruction ? '<br><small class="text-success">• ' + order.instruction + '</small>' : ''}
@@ -350,8 +359,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                required>
                         <small class="text-danger qty-warning mt-1" style="display:none;"></small>
                     </td>
-                    <td class="item-total fw-bold text-teal">Tsh 0</td>
-                    <input type="hidden" name="order_ids[]" value="${order.id}">
+                    <td class="item-total fw-bold text-teal">Tsh ${price.toLocaleString()}</td>
+                    <input type="hidden" name="order_ids[]" value="${order.id}" class="order-id-input">
                 </tr>`;
         });
 
@@ -367,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('multiIssueForm').action = `/pharmacy/issue-multiple/${visitId}`;
 
-        // Attach event listeners
+        // Re-attach quantity listeners
         document.querySelectorAll('.qty-input').forEach(input => {
             input.addEventListener('input', function() {
                 validateQuantity(this);
@@ -375,7 +384,54 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        updateTotals(); // Initial check
+        updateTotals();
+    });
+
+    // === DELETE MEDICINE FROM PRESCRIPTION (AJAX + DB DELETE) ===
+    document.getElementById('modalMedicinesList').addEventListener('click', function(e) {
+        const removeBtn = e.target.closest('.remove-medicine');
+        if (!removeBtn) return;
+
+        const row = removeBtn.closest('.medicine-row');
+        const orderId = row.dataset.orderId;
+
+        if (!confirm('Permanently delete this medicine from the prescription?\n\nThis action cannot be undone.')) {
+            return;
+        }
+
+        removeBtn.disabled = true;
+        removeBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+
+        fetch(`/pharmacy/order/${orderId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                row.remove();
+                updateTotals();
+                alert(data.message);
+
+                if (document.querySelectorAll('.medicine-row').length === 0) {
+                    document.getElementById('modalMedicinesList').innerHTML = 
+                        '<div class="alert alert-info text-center py-5">All prescribed medicines have been removed or issued.</div>';
+                    submitBtn.disabled = true;
+                }
+            } else {
+                alert(data.message || 'Failed to delete medicine.');
+                removeBtn.disabled = false;
+                removeBtn.innerHTML = '<i class="bi bi-trash"></i>';
+            }
+        })
+        .catch(() => {
+            alert('Network error. Please try again.');
+            removeBtn.disabled = false;
+            removeBtn.innerHTML = '<i class="bi bi-trash"></i>';
+        });
     });
 
     function validateQuantity(input) {
@@ -425,10 +481,11 @@ document.addEventListener('DOMContentLoaded', function () {
             submitBtn.classList.add('btn-secondary');
             submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Fix quantity errors above';
         } else {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('btn-secondary');
-            submitBtn.classList.add('btn-success');
-            submitBtn.innerHTML = 'Issue Selected Medicines';
+            const rowsLeft = document.querySelectorAll('.medicine-row').length;
+            submitBtn.disabled = rowsLeft === 0;
+            submitBtn.classList.toggle('btn-secondary', rowsLeft === 0);
+            submitBtn.classList.toggle('btn-success', rowsLeft > 0);
+            submitBtn.innerHTML = rowsLeft > 0 ? 'Issue Selected Medicines' : 'No Medicines to Issue';
         }
     }
 });

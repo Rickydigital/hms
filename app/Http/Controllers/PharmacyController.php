@@ -195,6 +195,36 @@ public function issueMultiple(Request $request, $visitId)
     return back()->with('success', 'All selected medicines have been issued.');
 }
 
+
+public function deleteOrder(VisitMedicineOrder $order)
+{
+    // Security: Only allow if not yet issued
+    if ($order->is_issued) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Cannot delete: Medicine already issued.'
+        ], 403);
+    }
+
+    // Optional: Add permission check
+    if (!Auth::user()->can('delete prescription')) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized.'
+        ], 403);
+    }
+
+    $medicineName = $order->medicine->medicine_name;
+
+    $order->delete();
+
+    return response()->json([
+        'success' => true,
+        'message' => "Removed: {$medicineName} (no longer prescribed)"
+    ]);
+}
+
+
 public function handoverMultiple($visitId)
 {
     $orders = VisitMedicineOrder::where('visit_id', $visitId)

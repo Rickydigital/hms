@@ -48,7 +48,7 @@ public function store(Request $request)
         'age_months'  => 'nullable|integer|min:0|max:11',
         'age_days'    => 'nullable|integer|min:0|max:31',
         'gender'      => 'required|in:Male,Female,Other',
-        'phone'       => 'required|string|max:15|unique:patients,phone',
+        'phone' => 'nullable|string|max:15',
         'address'     => 'nullable|string|max:500',
     ]);
 
@@ -99,7 +99,7 @@ public function update(Request $request, Patient $patient)
         'age_months'  => 'nullable|integer|min:0|max:11',
         'age_days'    => 'nullable|integer|min:0|max:31',
         'gender'      => 'required|in:Male,Female,Other',
-        'phone'       => 'required|string|max:15|unique:patients,phone,' . $patient->id,
+        'phone' => 'nullable|string|max:15',
         'address'     => 'nullable|string|max:500',
     ]);
 

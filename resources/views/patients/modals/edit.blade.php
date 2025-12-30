@@ -51,8 +51,8 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-medium">Phone Number <span class="text-danger">*</span></label>
-                        <input type="text" id="edit-phone" name="phone" class="form-control rounded-3" required>
+                        <label class="form-label fw-medium">Phone Number</label>
+                        <input type="text" id="edit-phone" name="phone" class="form-control rounded-3">
                     </div>
                     <div class="col-12">
                         <label class="form-label fw-medium">Address (Optional)</label>
