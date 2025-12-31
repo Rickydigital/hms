@@ -208,9 +208,13 @@
                                         </div>
                                     </div>
                                     <div class="text-end ms-3">
-                                        <span class="badge bg-success fs-6">
-                                            Qty: {{ $order->quantity_issued ?? 1 }}
-                                        </span>
+                                        @php
+    $issuedQty = $order->pharmacyIssues->sum('quantity_issued');
+    $issuedQty = $issuedQty > 0 ? $issuedQty : 1; // fallback only if no issues (shouldn't happen)
+@endphp
+<span class="badge bg-success fs-6">
+    Qty: {{ $issuedQty }}
+</span>
                                     </div>
                                 </div>
                             @endforeach

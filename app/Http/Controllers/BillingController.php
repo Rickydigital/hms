@@ -197,6 +197,8 @@ class BillingController extends Controller
 
 public function generateReceipt(Request $request, Visit $visit)
     {
+
+        
         Log::info("BillingController@generateReceipt - Attempting to generate receipt for visit ID: {$visit->id}");
 
         $view = $this->calculateBill($visit);
@@ -204,6 +206,15 @@ public function generateReceipt(Request $request, Visit $visit)
 
         Log::info("BillingController@generateReceipt - Grand Total: {$data['grandTotal']}");
 
+        $recentPayment = $visit->payments()
+    ->where('amount', $data['grandTotal'])
+    ->where('paid_at', '>', now()->subSeconds(10))
+    ->exists();
+
+if ($recentPayment) {
+    return redirect()->route('billing.index')
+        ->with('warning', 'Receipt already generated recently. Avoiding duplicate.');
+}
         if ($data['grandTotal'] <= 0) {
             Log::warning("BillingController@generateReceipt - No amount to bill for visit {$visit->id}");
             return back()->with('error', 'No pending amount to generate receipt.');
@@ -242,25 +253,27 @@ public function generateReceipt(Request $request, Visit $visit)
             // Save payment details
             $details = [];
 
-            foreach ($data['medicines'] as $order) {
-                $qty = $order->quantity_issued ?? 1;
-                $price = $order->medicine->price;
-                $total = $qty * $price;
+            // Save payment details - Medicines (correct quantity)
+foreach ($data['medicines'] as $order) {
+    $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
+    $price = $order->medicine->price;
+    $total = $issuedQty * $price;
 
-                $details[] = [
-                    'item_type'   => 'medicine',
-                    'item_name'   => $order->medicine->medicine_name,
-                    'quantity'    => $qty,
-                    'unit_price'  => $price,
-                    'total_price' => $total,
-                ];
+    $details[] = [
+        'item_type'   => 'medicine',
+        'item_name'   => $order->medicine->medicine_name,
+        'quantity'    => $issuedQty,
+        'unit_price'  => $price,
+        'total_price' => $total,
+    ];
 
-                $order->update([
-                    'is_paid' => true,
-                    'paid_at' => now(),
-                    'paid_by' => Auth::id(),
-                ]);
-            }
+    // Mark order as paid
+    $order->update([
+        'is_paid' => true,
+        'paid_at' => now(),
+        'paid_by' => Auth::id(),
+    ]);
+}
 
             foreach ($data['labTests'] as $test) {
                 $details[] = [
@@ -284,7 +297,7 @@ public function generateReceipt(Request $request, Visit $visit)
 
             Log::info("BillingController@generateReceipt - Receipt #{$receiptNo} and payment recorded successfully for visit {$visit->id}");
 
-            return back()->with('success', "Receipt {$receiptNo} generated and payment recorded successfully!");
+            return redirect()->route('billing.index')->with('success', "Receipt {$receiptNo} generated and payment recorded successfully!");
 
         } catch (\Exception $e) {
             Log::error("BillingController@generateReceipt - ERROR for visit {$visit->id}: " . $e->getMessage());
@@ -345,26 +358,27 @@ public function generateReceipt(Request $request, Visit $visit)
         }
 
         // Medicines - Use pharmacy_issues for correct quantity
-        foreach ($data['medicines'] as $order) {
-            $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
-            $price = $order->medicine->price;
-            $total = $issuedQty * $price;
+        // Medicines - Use pharmacy_issues for correct quantity
+foreach ($data['medicines'] as $order) {
+    $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
+    $price = $order->medicine->price;
+    $total = $issuedQty * $price;
 
-            $details[] = [
-                'item_type'   => 'medicine',
-                'item_name'   => $order->medicine->medicine_name,
-                'quantity'    => $issuedQty,
-                'unit_price'  => $price,
-                'total_price' => $total,
-            ];
+    $details[] = [
+        'item_type'   => 'medicine',
+        'item_name'   => $order->medicine->medicine_name,
+        'quantity'    => $issuedQty,
+        'unit_price'  => $price,
+        'total_price' => $total,
+    ];
 
-            // Mark as paid
-            $order->update([
-                'is_paid' => true,
-                'paid_at' => now(),
-                'paid_by' => Auth::id(),
-            ]);
-        }
+    // Mark as paid
+    $order->update([
+        'is_paid' => true,
+        'paid_at' => now(),
+        'paid_by' => Auth::id(),
+    ]);
+}
 
         // Lab Tests
         foreach ($data['labTests'] as $test) {

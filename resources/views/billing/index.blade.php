@@ -119,18 +119,34 @@
                     </div>
 
                     <!-- Generate Receipt Button -->
-  <div class="text-center mt-5">
+ <div class="text-center mt-5">
     @if($showGenerateButton)
-        
-        <form action="{{ route('billing.generate', $visit) }}" method="POST" class="d-inline">
-            @csrf
-            <button type="submit" class="btn btn-success btn-lg px-5 shadow">
-                Generate New Receipt (Current Items)
-            </button>
-        </form>
+        <form action="{{ route('billing.generate', $visit) }}" method="POST" class="d-inline" id="generateForm">
+    @csrf
+    <button type="submit" class="btn btn-success btn-lg px-5 shadow" id="generateBtn">
+        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+        Generate New Receipt (Current Items)
+    </button>
+</form>
+
+<script>
+document.getElementById('generateForm').addEventListener('submit', function() {
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.querySelector('.spinner-border').classList.remove('d-none');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+});
+</script>
+        <small class="text-muted d-block mt-2">
+            This will generate a full receipt and mark all items as paid.
+        </small>
     @else
         <div class="alert alert-success fs-5 px-5 py-3">
-            All items paid • Visit complete
+            @if($visit->receipt()->exists())
+                Full receipt already generated • Use "Record Payment" for additional payments
+            @else
+                All items paid • Visit complete
+            @endif
         </div>
     @endif
 </div>

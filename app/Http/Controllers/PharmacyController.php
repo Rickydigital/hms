@@ -41,15 +41,12 @@ public function index()
     $groupedPending = $orders->groupBy('visit_id');
 
     // Given today – also grouped
-    $givenTodayOrders = VisitMedicineOrder::with(['visit.patient'])
-        ->with(['medicine' => function ($query) {
-            $query->withSum('batches as total_stock', 'current_stock');
-        }])
-        ->where('is_issued', true)
-        ->where('is_paid', true)
-        ->whereDate('paid_at', today())
-        ->latest()
-        ->get();
+    $givenTodayOrders = VisitMedicineOrder::with(['visit.patient', 'medicine', 'pharmacyIssues'])
+    ->where('is_issued', true)
+    ->where('is_paid', true)
+    ->whereDate('paid_at', today())
+    ->latest()
+    ->get();
 
     $groupedGivenToday = $givenTodayOrders->groupBy('visit_id');
 
