@@ -75,11 +75,23 @@
 document.getElementById('registerPatientForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
+    // Prevent multiple submissions
+    const submitButton = this.querySelector('button[type="submit"]');
+    if (submitButton.disabled) {
+        return; // Already processing, ignore click
+    }
+
     // Clear previous errors
     document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
     document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
 
-    // === NO AGE VALIDATION ANYMORE ===
+    // Set loading state
+    const originalText = submitButton.innerHTML;
+    submitButton.disabled = true;
+    submitButton.innerHTML = `
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        Registering...
+    `;
 
     const formData = new FormData(this);
     const plainData = Object.fromEntries(formData);
@@ -96,7 +108,7 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
     .then(response => {
         if (!response.ok) {
             if (response.status === 422) return response.json().then(err => { throw err; });
-            return response.text().then(text => { throw new Error(text); });
+            return response.text().then(text => { throw new Error(text || 'Server error'); });
         }
         return response.json();
     })
@@ -107,7 +119,10 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
         }
     })
     .catch(error => {
+        console.error('Registration error:', error);
+
         if (error.errors) {
+            // Laravel validation errors
             Object.keys(error.errors).forEach(field => {
                 const input = document.querySelector(`[name="${field}"]`);
                 if (input) {
@@ -122,6 +137,11 @@ document.getElementById('registerPatientForm').addEventListener('submit', functi
         } else {
             alert(error.message || 'Something went wrong. Please try again.');
         }
+    })
+    .finally(() => {
+        // Always re-enable button after request completes
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText;
     });
 });
 </script>

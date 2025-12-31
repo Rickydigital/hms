@@ -95,10 +95,12 @@ class BillingController extends Controller
     // These are completely removed from billing
 
     // 1. Medicines: Only issued ones, with correct issued quantity
-    $medicines = $visit->medicineOrders()
-        ->where('is_issued', true)
-        ->with(['medicine', 'pharmacyIssues'])
-        ->get();
+    // 1. Medicines: Only issued AND unpaid ones
+$medicines = $visit->medicineOrders()
+    ->where('is_issued', true)
+    ->where('is_paid', false)  // ← CRITICAL: Only unpaid
+    ->with(['medicine', 'pharmacyIssues'])
+    ->get();
 
     // 2. Lab Tests: Only unpaid ones
     $labTests = $visit->labOrders()
