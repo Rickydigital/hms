@@ -26,7 +26,7 @@ class BillingController extends Controller
             })
             // OR has medicine orders that are not issued OR not paid
             ->orWhereHas('medicineOrders', function ($sq) {
-                $sq->where('is_issued', true)
+                $sq->where('is_issued', false)
                    ->orWhere('is_paid', false);
             })
             // OR has unpaid injections (if you add payment flag later)
@@ -38,14 +38,34 @@ class BillingController extends Controller
 
     // IN PROGRESS: Visits with services but not fully completed/paid
     $inProgressVisits = Visit::with(['patient', 'doctor'])
-        ->where(function ($q) {
-            $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
-              ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
-              ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
-              ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false));
+    ->where(function ($q) {
+        // Lab: not completed OR completed but not paid
+        $q->whereHas('labOrders', function ($sq) {
+            $sq->where('is_completed', false)
+               ->orWhere(function ($paid) {
+                   $paid->where('is_completed', true)
+                        ->where('is_paid', false);
+               });
         })
-        ->latest('visit_date')
-        ->get();
+        // Medicine: not issued OR issued but not paid
+        ->orWhereHas('medicineOrders', function ($sq) {
+            $sq->where('is_issued', false)
+               ->orWhere(function ($paid) {
+                   $paid->where('is_issued', true)
+                        ->where('is_paid', false);
+               });
+        })
+        // Injection: not given (assuming you add is_paid later)
+        ->orWhereHas('injectionOrders', function ($sq) {
+            $sq->where('is_given', false);
+            // When you add payment tracking:
+            // ->orWhere(function($p) { $p->where('is_given', true)->where('is_paid', false); });
+        })
+        // Bed admission: not discharged
+        ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false));
+    })
+    ->latest('visit_date')
+    ->get();
 
     $receipts = Receipt::with(['visit.patient', 'visit.payments'])
         ->latest('generated_at')
