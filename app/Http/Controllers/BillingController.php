@@ -39,30 +39,26 @@ class BillingController extends Controller
     // IN PROGRESS: Visits with services but not fully completed/paid
     $inProgressVisits = Visit::with(['patient', 'doctor'])
     ->where(function ($q) {
-        // Lab: not completed OR completed but not paid
+        // Lab still needs completion (ignore already paid completed ones)
         $q->whereHas('labOrders', function ($sq) {
-            $sq->where('is_completed', false)
-               ->orWhere(function ($paid) {
-                   $paid->where('is_completed', true)
-                        ->where('is_paid', false);
-               });
+            $sq->where('is_completed', false);
+            // Note: We do NOT care about payment here — payment belongs to Pending
         })
-        // Medicine: not issued OR issued but not paid
+
+        // Medicine still needs to be issued
         ->orWhereHas('medicineOrders', function ($sq) {
-            $sq->where('is_issued', false)
-               ->orWhere(function ($paid) {
-                   $paid->where('is_issued', true)
-                        ->where('is_paid', false);
-               });
+            $sq->where('is_issued', false);
         })
-        // Injection: not given (assuming you add is_paid later)
+
+        // Injection still needs to be given
         ->orWhereHas('injectionOrders', function ($sq) {
             $sq->where('is_given', false);
-            // When you add payment tracking:
-            // ->orWhere(function($p) { $p->where('is_given', true)->where('is_paid', false); });
         })
-        // Bed admission: not discharged
-        ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false));
+
+        // Bed still occupied
+        ->orWhereHas('bedAdmission', function ($sq) {
+            $sq->where('is_discharged', false);
+        });
     })
     ->latest('visit_date')
     ->get();
