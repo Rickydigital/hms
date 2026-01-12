@@ -38,28 +38,7 @@ class BillingController extends Controller
 
     // IN PROGRESS: Visits with services but not fully completed/paid
     $inProgressVisits = Visit::with(['patient', 'doctor'])
-    ->where(function ($q) {
-        // Lab still needs completion (ignore already paid completed ones)
-        $q->whereHas('labOrders', function ($sq) {
-            $sq->where('is_completed', false);
-            // Note: We do NOT care about payment here — payment belongs to Pending
-        })
-
-        // Medicine still needs to be issued
-        ->orWhereHas('medicineOrders', function ($sq) {
-            $sq->where('is_issued', false);
-        })
-
-        // Injection still needs to be given
-        ->orWhereHas('injectionOrders', function ($sq) {
-            $sq->where('is_given', false);
-        })
-
-        // Bed still occupied
-        ->orWhereHas('bedAdmission', function ($sq) {
-            $sq->where('is_discharged', false);
-        });
-    })
+    ->where('status', 'in_progress')           
     ->latest('visit_date')
     ->get();
 
