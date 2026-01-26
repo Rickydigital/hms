@@ -13,11 +13,25 @@ class MedicineController extends Controller
         $this->middleware('permission:manage medicines');
     }
 
-    public function index()
-    {
-        $medicines = MedicineMaster::orderBy('medicine_name')->paginate(25);
-        return view('admin.medicines.index', compact('medicines'));
-    }
+    public function index(Request $request)
+{
+    $q = trim($request->get('q', ''));
+
+    $medicines = MedicineMaster::query()
+        ->when($q !== '', function ($query) use ($q) {
+            $query->where(function ($x) use ($q) {
+                $x->where('medicine_name', 'like', "%{$q}%")
+                  ->orWhere('medicine_code', 'like', "%{$q}%")
+                  ->orWhere('generic_name', 'like', "%{$q}%")
+                  ->orWhere('packing', 'like', "%{$q}%");
+            });
+        })
+        ->orderBy('medicine_name')
+        ->paginate(25)
+        ->appends(['q' => $q]); // keep q during paging
+
+    return view('admin.medicines.index', compact('medicines', 'q'));
+}
 
     public function store(Request $request)
     {

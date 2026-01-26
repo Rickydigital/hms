@@ -9,6 +9,18 @@
         </button>
     </div>
 
+    <div class="card border-0 shadow-sm rounded-4 mb-3">
+    <div class="card-body p-3">
+        <div class="input-group input-group-lg">
+        <span class="input-group-text bg-white border-end-0">Search</span>
+        <input type="text" id="medicineSearchInput" class="form-control"
+            value="{{ $q ?? '' }}"
+            placeholder="Search by code, name, generic, packing..."
+            autocomplete="off">
+        </div>
+    </div>
+    </div>
+
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -19,25 +31,29 @@
                             <th>Medicine Name</th>
                             <th>Generic / Packing</th>
                             <th class="text-end">Price</th>
-                            <th>Stock Alert</th>
+                            {{--  <th>Stock Alert</th>  --}}
                             <th>Status</th>
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($medicines as $med)
-                        <tr>
+                        <tr class="medicine-row"
+                            data-code="{{ strtolower($med->medicine_code) }}"
+                            data-name="{{ strtolower($med->medicine_name) }}"
+                            data-generic="{{ strtolower($med->generic_name ?? '') }}"
+                            data-packing="{{ strtolower($med->packing ?? '') }}">
                             <td><span class="badge bg-dark">{{ $med->medicine_code }}</span></td>
                             <td><strong>{{ $med->medicine_name }}</strong></td>
                             <td class="small text-muted">{{ $med->generic_name }} • {{ $med->packing }}</td>
                             <td class="text-end fw-bold text-success">Tsh{{ number_format($med->price, 2) }}</td>
-                            <td>
+                            {{--  <td>
                                 @if($med->current_stock <= $med->minimum_stock)
                                     <span class="badge bg-danger">Low Stock</span>
                                 @else
                                     <span class="badge bg-success">{{ $med->current_stock ?? 0 }}</span>
                                 @endif
-                            </td>
+                            </td>  --}}
                             <td>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" {{ $med->is_active ? 'checked' : '' }} disabled>
@@ -137,4 +153,24 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const input = document.getElementById('medicineSearchInput');
+  let t = null;
+
+  input?.addEventListener('input', function () {
+    clearTimeout(t);
+    const q = this.value.trim();
+
+    t = setTimeout(() => {
+      const url = new URL(window.location.href);
+      if (q) url.searchParams.set('q', q);
+      else url.searchParams.delete('q');
+      url.searchParams.delete('page'); // reset to page 1
+      window.location.href = url.toString();
+    }, 350); // debounce
+  });
+});
+</script>
 @endsection

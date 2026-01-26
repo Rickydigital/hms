@@ -26,8 +26,8 @@ class BillingController extends Controller
             })
             // OR has medicine orders that are not issued OR not paid
             ->orWhereHas('medicineOrders', function ($sq) {
-                $sq->where('is_issued', false)
-                   ->orWhere('is_paid', false);
+                $sq->where('is_paid', false);
+                //    ->orWhere('is_paid', false);
             })
             // OR has unpaid injections (if you add payment flag later)
             ->orWhereHas('injectionOrders')

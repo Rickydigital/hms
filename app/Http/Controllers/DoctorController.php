@@ -100,183 +100,184 @@ class DoctorController extends Controller
         return back()->with('success', 'Vitals saved successfully!');
     }
 
-    public function storePrescription(Request $request, Visit $visit)
-    {
+   public function storePrescription(Request $request, Visit $visit)
+{
+    Log::info('PRESCRIPTION STORE HIT', [
+        'visit_id' => $visit->id,
+        'all_input' => $request->except(['_token']),
+        'has_medicine' => $request->has('medicines'),
+        'medicines_raw' => $request->input('medicines'),
+    ]);
 
-        Log::info('PRESCRIPTION STORE HIT', [
-            'visit_id' => $visit->id,
-            'all_input' => $request->except(['_token']),
-            'has_medicine' => $request->has('medicines'),
-            'medicines_raw' => $request->input('medicines'),
-        ]);
+    $this->authorizeAccess();
 
-        $this->authorizeAccess();
+    $request->validate([
+        'chief_complaint' => 'nullable|string',
+        'examination'     => 'nullable|string',
+        'diagnosis'       => 'nullable|string',
+        'lab_tests.*'     => 'exists:lab_tests_master,id',
 
-        $request->validate([
-            'chief_complaint' => 'nullable|string',
-            'examination'     => 'nullable|string',
-            'diagnosis'       => 'nullable|string',
-            'lab_tests.*'     => 'exists:lab_tests_master,id',
+        'injection_medicine_id' => 'nullable|exists:medicines_master,id',
+        'injection_route'       => 'nullable|string',
 
+        'ward_id'               => 'nullable|exists:wards,id',
+        'admission_reason'      => 'nullable|string',
+    ]);
 
+    // Save clinical notes
+    $visit->vitals()->updateOrCreate(
+        ['visit_id' => $visit->id],
+        $request->only(['chief_complaint', 'examination', 'diagnosis'])
+    );
 
-            'injection_medicine_id' => 'nullable|exists:medicines_master,id',
-            'injection_route'       => 'nullable|string',
+    $hasLab       = $request->filled('lab_tests');
+    $hasMedicine  = $request->filled('medicines.medicine_id') && count($request->input('medicines.medicine_id', [])) > 0;
+    $hasInjection = $request->filled('injection_medicine_id');
+    $hasAdmission = $request->filled('ward_id');
 
-            'ward_id'               => 'nullable|exists:wards,id',
-            'admission_reason'      => 'nullable|string',
-        ]);
+    $hasAnyService = $hasLab || $hasMedicine || $hasInjection || $hasAdmission;
 
-        // Save clinical notes
-        $visit->vitals()->updateOrCreate(
-            ['visit_id' => $visit->id],
-            $request->only(['chief_complaint', 'examination', 'diagnosis'])
-        );
-
-        $hasLab       = $request->filled('lab_tests');
-        $hasMedicine = $request->has('medicines.medicine_id') && count($request->input('medicines.medicine_id', [])) > 0;
-        $hasInjection = $request->filled('injection_medicine_id');
-        $hasAdmission = $request->filled('ward_id');
-
-        $hasAnyService = $hasLab || $hasMedicine || $hasInjection || $hasAdmission;
-
-        // Lab Orders
-        if ($hasLab) {
-            foreach ($request->lab_tests as $testId) {
-                VisitLabOrder::updateOrCreate([
-                    'visit_id' => $visit->id,
-                    'lab_test_id' => $testId
-                ], ['extra_instruction' => $request->lab_instruction ?? '']);
-            }
+    // -------------------------
+    // Lab Orders
+    // -------------------------
+    if ($hasLab) {
+        foreach ($request->lab_tests as $testId) {
+            VisitLabOrder::updateOrCreate(
+                ['visit_id' => $visit->id, 'lab_test_id' => $testId],
+                ['extra_instruction' => $request->lab_instruction ?? '']
+            );
         }
-
-        $hasMedicine = $request->filled('medicines.medicine_id');
-
-        if ($hasMedicine) {
-            Log::info('MEDICINES REQUEST DATA:', $request->medicines ?? []);
-
-            $medicineIds       = $request->input('medicines.medicine_id', []);
-            $dosages           = $request->input('medicines.dosage', []);
-            $durationDays      = $request->input('medicines.duration_days', []);
-            $instructions      = $request->input('medicines.instruction', []);
-            $extraInstructions = $request->input('medicines.extra_instruction', []);
-
-            $alreadyPrescribed = [];
-            $newlyAdded = [];
-            $errors = [];
-
-            foreach ($medicineIds as $index => $medicineId) {
-                if (empty($medicineId)) {
-                    continue;
-                }
-
-                $dosage           = $dosages[$index] ?? '';
-                $duration         = $durationDays[$index] ?? null;
-                $instruction      = $instructions[$index] ?? '';
-                $extraInstruction = $extraInstructions[$index] ?? '';
-
-                // Manual validation for this medicine
-                if (empty($dosage)) {
-                    $errors[] = "Dosage is required for selected medicine.";
-                }
-                if (empty($duration) || $duration < 1) {
-                    $errors[] = "Valid duration (at least 1 day) is required.";
-                }
-                $medicine = \App\Models\MedicineMaster::find($medicineId);
-                if (!$medicine) {
-                    $errors[] = "Invalid medicine selected.";
-                }
-
-                // If any error, collect and continue to next
-                if (!empty($errors)) {
-                    continue; // Don't save this one, but check others
-                }
-
-                $medicineName = $medicine->medicine_name;
-
-                $exists = VisitMedicineOrder::where('visit_id', $visit->id)
-                    ->where('medicine_id', $medicineId)
-                    ->exists();
-
-                if ($exists) {
-                    $alreadyPrescribed[] = $medicineName;
-                } else {
-                    VisitMedicineOrder::create([
-                        'visit_id'          => $visit->id,
-                        'medicine_id'       => $medicineId,
-                        'dosage'            => $dosage,
-                        'duration_days'     => $duration,
-                        'instruction'       => $instruction,
-                        'extra_instruction' => $extraInstruction,
-                    ]);
-                    $newlyAdded[] = $medicineName;
-                }
-            }
-
-            // Only return errors if there were validation issues
-            if (!empty($errors)) {
-                return back()->withErrors($errors)->withInput();
-            }
-
-            // Success message
-            $message = 'Prescription sent successfully!';
-            if (!empty($alreadyPrescribed)) {
-                $message .= ' | Already prescribed (not added again): ' . implode(', ', $alreadyPrescribed);
-            }
-            if (!empty($newlyAdded)) {
-                $message .= ' | New medicines added: ' . implode(', ', $newlyAdded);
-            }
-
-            return back()->with('success', $message);
-        }
-        // Injection
-        if ($hasInjection) {
-            VisitInjectionOrder::create([
-                'visit_id' => $visit->id,
-                'medicine_id' => $request->injection_medicine_id,
-                'route' => $request->injection_route,
-            ]);
-        }
-
-        // Admission
-        if ($hasAdmission) {
-            $ward = Ward::findOrFail($request->ward_id);
-            if ($ward->available_beds <= 0) {
-                return back()->withErrors(['ward_id' => 'No beds available']);
-            }
-            VisitBedAdmission::create([
-                'visit_id' => $visit->id,
-                'ward_id' => $ward->id,
-                'admission_date' => today(),
-                'admission_reason' => $request->admission_reason,
-            ]);
-        }
-
-        // FINAL STATUS LOGIC – FIXED!
-        if ($request->has('follow_up_only')) {
-            $visit->update([
-                'status' => 'follow_up',
-                'all_services_completed' => true
-            ]);
-            return back()->with('success', 'Follow-up advised');
-        }
-
-        if ($hasAnyService) {
-            // Doctor ordered services → send to billing immediately
-            $visit->update([
-                'status' => $hasLab ? 'sent_to_lab' : ($hasMedicine || $hasInjection ? 'sent_to_pharmacy' : ($hasAdmission ? 'admitted' : 'consulting')),
-                'all_services_completed' => false  // Services pending payment/completion
-            ]);
-        } else {
-            // No services ordered → consultation complete
-            $visit->update([
-                'status' => 'consulting',
-                'all_services_completed' => true
-            ]);
-        }
-
-        return back()->with('success', 'Prescription sent successfully!');
     }
+
+    // -------------------------
+    // Medicines (ALLOW DUPLICATES)
+    // -------------------------
+    $addedMedicines = [];
+    $errors = [];
+
+    if ($hasMedicine) {
+        Log::info('MEDICINES REQUEST DATA:', $request->medicines ?? []);
+
+        $medicineIds       = $request->input('medicines.medicine_id', []);
+        $dosages           = $request->input('medicines.dosage', []);
+        $durationDays      = $request->input('medicines.duration_days', []);
+        $instructions      = $request->input('medicines.instruction', []);
+        $extraInstructions = $request->input('medicines.extra_instruction', []);
+
+        foreach ($medicineIds as $index => $medicineId) {
+            if (empty($medicineId)) {
+                continue;
+            }
+
+            // validate row-by-row (important!)
+            $rowErrors = [];
+
+            $dosage           = $dosages[$index] ?? '';
+            $duration         = $durationDays[$index] ?? null;
+            $instruction      = $instructions[$index] ?? '';
+            $extraInstruction = $extraInstructions[$index] ?? '';
+
+            if (trim($dosage) === '') {
+                $rowErrors[] = "Dosage is required for medicine row #" . ($index + 1) . ".";
+            }
+            if (empty($duration) || (int)$duration < 1) {
+                $rowErrors[] = "Valid duration (at least 1 day) is required for medicine row #" . ($index + 1) . ".";
+            }
+
+            $medicine = \App\Models\MedicineMaster::find($medicineId);
+            if (!$medicine) {
+                $rowErrors[] = "Invalid medicine selected for row #" . ($index + 1) . ".";
+            }
+
+            if (!empty($rowErrors)) {
+                $errors = array_merge($errors, $rowErrors);
+                continue; // skip saving this row, continue with others
+            }
+
+            // ✅ ALWAYS CREATE (even if same medicine already exists for this visit)
+            VisitMedicineOrder::create([
+                'visit_id'          => $visit->id,
+                'medicine_id'       => $medicineId,
+                'dosage'            => $dosage,
+                'duration_days'     => (int)$duration,
+                'instruction'       => $instruction,
+                'extra_instruction' => $extraInstruction,
+            ]);
+
+            $addedMedicines[] = $medicine->medicine_name;
+        }
+    }
+
+    // If there were any validation issues in medicine rows, return them
+    if (!empty($errors)) {
+        return back()->withErrors($errors)->withInput();
+    }
+
+    // -------------------------
+    // Injection
+    // -------------------------
+    if ($hasInjection) {
+        VisitInjectionOrder::create([
+            'visit_id'    => $visit->id,
+            'medicine_id' => $request->injection_medicine_id,
+            'route'       => $request->injection_route,
+        ]);
+    }
+
+    // -------------------------
+    // Admission
+    // -------------------------
+    if ($hasAdmission) {
+        $ward = Ward::findOrFail($request->ward_id);
+
+        if ($ward->available_beds <= 0) {
+            return back()->withErrors(['ward_id' => 'No beds available'])->withInput();
+        }
+
+        VisitBedAdmission::create([
+            'visit_id'          => $visit->id,
+            'ward_id'           => $ward->id,
+            'admission_date'    => today(),
+            'admission_reason'  => $request->admission_reason,
+        ]);
+    }
+
+    // -------------------------
+    // FINAL STATUS LOGIC
+    // -------------------------
+    if ($request->has('follow_up_only')) {
+        $visit->update([
+            'status' => 'follow_up',
+            'all_services_completed' => true
+        ]);
+
+        return back()->with('success', 'Follow-up advised');
+    }
+
+    if ($hasAnyService) {
+        $visit->update([
+            'status' => $hasLab ? 'sent_to_lab'
+                : (($hasMedicine || $hasInjection) ? 'sent_to_pharmacy'
+                : ($hasAdmission ? 'admitted' : 'consulting')),
+            'all_services_completed' => false
+        ]);
+    } else {
+        $visit->update([
+            'status' => 'consulting',
+            'all_services_completed' => true
+        ]);
+    }
+
+    // -------------------------
+    // Success message
+    // -------------------------
+    $message = 'Prescription sent successfully!';
+    if (!empty($addedMedicines)) {
+        $message .= ' | Medicines added: ' . implode(', ', $addedMedicines);
+    }
+
+    return back()->with('success', $message);
+}
 
     private function authorizeAccess()
     {

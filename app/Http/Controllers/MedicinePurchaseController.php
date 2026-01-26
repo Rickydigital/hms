@@ -28,6 +28,7 @@ class MedicinePurchaseController extends Controller
         $medicines = MedicineMaster::active()->orderBy('medicine_name')->get();
         return view('store.purchase.create', compact('suppliers', 'medicines'));
     }
+    
 
 
 public function store(Request $request)

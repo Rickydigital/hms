@@ -3,7 +3,7 @@
 
 @section('content')
 <div class="min-vh-100 bg-gray-50">
-
+   
     <!-- CLEAN & ELEGANT HEADER -->
     <div class="bg-white border-bottom shadow-sm">
         <div class="container-fluid py-5">
