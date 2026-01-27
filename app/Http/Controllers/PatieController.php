@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\Patient;
 use App\Models\Setting;          
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 
-class PatientController extends Controller
+class PatieController extends Controller
 {
-    public function __construct()
+     public function __construct()
     {
         $this->middleware('auth');
         $this->middleware('permission:view patients')->only('index');
@@ -91,7 +91,46 @@ public function store(Request $request)
 }
 
 
-public function history(Patient $patient)
+
+
+/**
+ * History page: list patients A-Z
+ */
+public function historyIndex(Request $request)
+{
+    $patients = Patient::query()
+        ->orderBy('name')
+        ->paginate(20)
+        ->withQueryString();
+
+    return view('patients.history', compact('patients'));
+}
+
+public function historySearch(Request $request)
+{
+    $term = trim($request->get('term', ''));
+
+    $patients = Patient::query()
+        ->when($term !== '', function ($q) use ($term) {
+            $q->where(function ($qq) use ($term) {
+                $qq->where('name', 'like', "%{$term}%")
+                   ->orWhere('patient_id', 'like', "%{$term}%")
+                   ->orWhere('phone', 'like', "%{$term}%");
+            });
+        })
+        ->orderBy('name')
+        ->limit(20)
+        ->get(['id', 'name', 'patient_id', 'phone']);
+
+    return response()->json([
+        'results' => $patients->map(fn($p) => [
+            'id' => $p->id,
+            'text' => "{$p->name} • {$p->patient_id}" . ($p->phone ? " • {$p->phone}" : ''),
+        ]),
+    ]);
+}
+
+public function historyData(Patient $patient)
 {
     $patient->load([
         'visits' => function ($q) {
@@ -100,15 +139,18 @@ public function history(Patient $patient)
               ->with([
                   'doctor:id,name',
                   'vitals',
-                  'labOrders.results',      // if you have results relation
-                  'medicineOrders.medicine' // medicine master
+                  'labOrders.test',     // lab test master name/price etc
+                  'labOrders.result',   // LabResult (hasOne)
+                  'medicineOrders.medicine',
+                  'payments.receivedBy:id,name',
+                  'receipt',
               ]);
-        }
+        },
     ]);
 
     return response()->json([
         'success' => true,
-        'patient' => $patient
+        'patient' => $patient,
     ]);
 }
 

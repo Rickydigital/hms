@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\{
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\LabController;
 use App\Http\Controllers\MedicinePurchaseController;
+use App\Http\Controllers\PatieController;
 use App\Http\Controllers\PharmacyController;
 use App\Http\Controllers\PharmacySaleController;
 use Illuminate\Support\Facades\Route;
@@ -36,11 +37,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/pharmacy/medicines/search', [PharmacySaleController::class, 'search'])
     ->name('pharmacy.medicines.search');
     // Patients
-    Route::put('patients/{patient}', [PatientController::class, 'update'])
-     ->name('patients.update');
-    Route::resource('patients', PatientController::class)->only(['index', 'store']);
+    Route::put('patients/{patient}', [PatieController::class, 'update'])->name('patients.update');
+    Route::resource('patients', PatieController::class)->only(['index', 'store']);
     Route::post('/patients/{patient}/visit', [VisitController::class, 'store'])->name('patients.visit.store');
-    Route::post('patients/{patient}/reactivate', [PatientController::class, 'reactivate'])->name('patients.reactivate');
+    Route::post('patients/{patient}/reactivate', [PatieController::class, 'reactivate'])->name('patients.reactivate');
+    Route::get('/patient-history', [PatieController::class, 'historyIndex'])->name('patients.history.index');
+Route::get('/patient-history/search', [PatieController::class, 'historySearch'])->name('patients.history.search');
+Route::get('/patient-history/{patient}/data', [PatieController::class, 'historyData'])->name('patients.history.data');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
