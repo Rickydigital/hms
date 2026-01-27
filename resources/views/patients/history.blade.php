@@ -134,8 +134,10 @@
   </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -150,6 +152,15 @@ document.addEventListener('DOMContentLoaded', function () {
             processResults: data => data
         }
     });
+
+    // Auto-open modal if ?open=PATIENT_ID is provided
+const urlParams = new URLSearchParams(window.location.search);
+const openId = urlParams.get('open');
+if (openId) {
+    const modal = new bootstrap.Modal(document.getElementById('patientHistoryModal'));
+    modal.show();
+    openHistoryModal(openId);
+}
 
     $('#historyPatientSearch').on('select2:select', function (e) {
         const patientId = e.params.data.id;
@@ -232,7 +243,7 @@ async function openHistoryModal(patientId) {
                 // Medicines
                 const meds = v.medicine_orders || v.medicineOrders || [];
                 const medsHtml = meds.length ? meds.map(m => {
-                    const name = m.medicine?.name ?? 'Medicine';
+                    const name = m.medicine?.medicine_name || m.medicine?.generic_name || 'Medicine';
                     return `<div class="small mb-2">
                         <b>${esc(name)}</b><br>
                         Dosage: ${esc(m.dosage ?? '—')} • Days: ${esc(m.duration_days ?? '—')}<br>

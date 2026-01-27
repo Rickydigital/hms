@@ -14,7 +14,9 @@ class PatieController extends Controller
      public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware('permission:view patients')->only('index');
+        $this->middleware('permission:view patients')->only([
+        'index', 'historyIndex', 'historySearch', 'historyData'
+        ]);
         $this->middleware('permission:create patient')->only('store');
         $this->middleware('permission:reactivate patient')->only('reactivate');
     }

@@ -171,7 +171,15 @@
                             <div class="col-xl-7">
                                 <div class="card h-100">
                                     <div class="card-body">
-                                        <h5 class="text-primary mb-4">Patient Details</h5>
+                                        <div class="d-flex justify-content-between align-items-center mb-4">
+                                            <h5 class="text-primary mb-0">Patient Details</h5>
+
+                                            {{-- View Past History button --}}
+                                            <a href="{{ route('patients.history.index') }}?open={{ $visit->patient->id }}"
+                                            class="btn btn-outline-light bg-primary border-0 shadow-sm rounded-pill px-4">
+                                                <i class="bi bi-clock-history me-2"></i> View Past History
+                                            </a>
+                                        </div>
                                         <h4 class="mb-1">{{ $visit->patient->name }}</h4>
                                         <p class="text-muted mb-3">{{ $visit->patient->age }} years • {{ $visit->patient->gender }}</p>
                                         <div class="row g-3">
