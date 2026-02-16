@@ -20,22 +20,70 @@ class PatientController extends Controller
     }
 
     public function index(Request $request)
-    {
-        $query = Patient::query();
+{
+    $query = Patient::query();
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(fn($q) => $q
-                ->where('patient_id', 'LIKE', "%$search%")
-                ->orWhere('name', 'LIKE', "%$search%")
-                ->orWhere('phone', 'LIKE', "%$search%")
-            );
-        }
+    if ($request->filled('search')) {
+        $search = trim($request->search);
 
-        $patients = $query->latest()->paginate(20)->withQueryString();
-
-        return view('patients.index', compact('patients'));
+        $query->where(function ($q) use ($search) {
+            $q->where('patient_id', 'LIKE', "%{$search}%")
+              ->orWhere('name', 'LIKE', "%{$search}%")
+              ->orWhere('phone', 'LIKE', "%{$search}%");
+        });
     }
+
+    // Avoid N+1 for today visit check
+    $patients = $query
+        ->latest()
+        ->paginate(20)
+        ->withQueryString();
+
+    // ✅ If request is AJAX, return JSON (same route, same controller)
+    if ($request->ajax() || $request->wantsJson()) {
+        $today = today();
+
+        $data = $patients->getCollection()->map(function ($p) use ($today) {
+            $expired = $p->expiry_date && $p->expiry_date->lt($today);
+
+            $hasVisitToday = $p->visits()
+                ->whereDate('visit_date', $today)
+                ->exists();
+
+            // build display age like you do in blade
+            $ageDisplay = '—';
+            if ($p->age_months || $p->age_days) {
+                $ageDisplay =
+                    trim(($p->age_months ? $p->age_months . ' months ' : '') .
+                         ($p->age_days ? $p->age_days . ' days' : ''));
+            } elseif (!is_null($p->age)) {
+                $ageDisplay = $p->age . ' yrs';
+            }
+
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'patient_id' => $p->patient_id,
+                'gender' => $p->gender,
+                'phone' => $p->phone,
+                'address' => $p->address,
+                'age_display' => $ageDisplay,
+                'expiry_date' => optional($p->expiry_date)->format('d M Y'),
+                'is_active' => (bool) $p->is_active,
+                'expired' => $expired,
+                'has_visit_today' => $hasVisitToday,
+            ];
+        });
+
+        return response()->json([
+            'patients' => $data,
+            'pagination' => (string) $patients->links('pagination::bootstrap-5'),
+        ]);
+    }
+
+    return view('patients.index', compact('patients'));
+}
+
 
 
     
