@@ -81,6 +81,49 @@ public function getAgeDisplayAttribute(): string
         $this->save();
     }
 
+    public function getRegistrationTimeAttribute(): string
+    {
+        return $this->registration_date
+            ? $this->registration_date->timezone('Africa/Dar_es_Salaam')->format('H:i')
+            : '—';
+    }
+
+    /**
+     * Get created_at time in Dar es Salaam (only time)
+     */
+    public function getCreatedTimeAttribute(): string
+    {
+        return $this->created_at
+            ? $this->created_at->timezone('Africa/Dar_es_Salaam')->format('H:i')
+            : '—';
+    }
+
+    /**
+     * Get updated_at time in Dar es Salaam (only time)
+     */
+    public function getUpdatedTimeAttribute(): string
+    {
+        return $this->updated_at
+            ? $this->updated_at->timezone('Africa/Dar_es_Salaam')->format('H:i')
+            : '—';
+    }
+
+    /**
+     * Get expiry time in Dar es Salaam (only time)
+     */
+    public function getExpiryTimeAttribute(): string
+    {
+        return $this->expiry_date
+            ? $this->expiry_date->timezone('Africa/Dar_es_Salaam')->format('H:i')
+            : '—';
+    }
+
+    // Optional: full datetime with timezone (for debugging)
+    public function getLocalCreatedAtAttribute()
+    {
+        return $this->created_at ? $this->created_at->timezone('Africa/Dar_es_Salaam') : null;
+    }
+
 protected static function booted()
 {
     static::creating(function ($patient) {

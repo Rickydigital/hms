@@ -25,6 +25,17 @@ Route::get('/', function () {
 });
 
 // routes/web.php
+Route::get('/check-time', function () {
+    return [
+        'app_timezone'      => config('app.timezone'),
+        'php_default'       => date_default_timezone_get(),
+        'current_time'      => now()->toDateTimeString(),
+        'current_time_eat'  => now()->timezone('Africa/Dar_es_Salaam')->toDateTimeString(),
+        'utc_time'          => now('UTC')->toDateTimeString(),
+    ];
+});
+
+// routes/web.php
 Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
