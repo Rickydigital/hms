@@ -34,7 +34,7 @@ class PatieController extends Controller
         });
     }
 
-    $patients = $query->latest()->paginate(5)->withQueryString();
+    $patients = $query->latest()->paginate(20)->withQueryString();
 
     if ($request->ajax()) {
         return response()->json([
