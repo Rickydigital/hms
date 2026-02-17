@@ -22,22 +22,29 @@ class PatieController extends Controller
     }
 
     public function index(Request $request)
-    {
-        $query = Patient::query();
+{
+    $query = Patient::query();
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(fn($q) => $q
-                ->where('patient_id', 'LIKE', "%$search%")
-                ->orWhere('name', 'LIKE', "%$search%")
-                ->orWhere('phone', 'LIKE', "%$search%")
-            );
-        }
-
-        $patients = $query->latest()->paginate(20)->withQueryString();
-
-        return view('patients.index', compact('patients'));
+    if ($request->filled('search')) {
+        $search = trim($request->search);
+        $query->where(function ($q) use ($search) {
+            $q->where('patient_id', 'LIKE', "%{$search}%")
+              ->orWhere('name', 'LIKE', "%{$search}%")
+              ->orWhere('phone', 'LIKE', "%{$search}%");
+        });
     }
+
+    $patients = $query->latest()->paginate(20)->withQueryString();
+
+    if ($request->ajax()) {
+        return response()->json([
+            'html'       => view('patients.partials.patients-grid', compact('patients'))->render(),
+            'pagination' => $patients->links('pagination::bootstrap-5')->toHtml(),
+        ]);
+    }
+
+    return view('patients.index', compact('patients'));
+}
 
 
     
