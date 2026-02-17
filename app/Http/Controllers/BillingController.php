@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MedicineBatch;
 use App\Models\Payment;
 use App\Models\PaymentDetail;
 use App\Models\Visit;
@@ -11,6 +12,7 @@ use App\Models\Receipt;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class BillingController extends Controller
@@ -53,6 +55,82 @@ class BillingController extends Controller
     ));
 }
 
+public function removeItem(Request $request)
+{
+    $validated = $request->validate([
+        'visit_id'  => 'required|exists:visits,id',
+        'item_id'   => 'required|integer',
+        'item_type' => 'required|in:medicine,lab,injection',
+    ]);
+
+    $response = ['success' => false, 'message' => 'Unknown error'];
+
+    try {
+        $visit = Visit::findOrFail($request->visit_id);
+
+        DB::transaction(function () use ($request, $visit, &$response) {
+            $message = '';
+
+            if ($request->item_type === 'medicine') {
+                $order = $visit->medicineOrders()->findOrFail($request->item_id);
+
+                if ($order->is_issued) {
+                    throw new \Exception('Cannot remove: medicine already issued.');
+                }
+
+                $issues = $order->pharmacyIssues;
+                foreach ($issues as $issue) {
+                    MedicineBatch::where('medicine_id', $issue->medicine_id)
+                        ->where('batch_no', $issue->batch_no)
+                        ->increment('current_stock', $issue->quantity_issued);
+                    $issue->delete();
+                }
+
+                $medicineName = $order->medicine->medicine_name;
+                $order->delete();
+
+                $message = "Medicine '{$medicineName}' removed. Stock restored.";
+            } elseif ($request->item_type === 'lab') {
+                $order = $visit->labOrders()->findOrFail($request->item_id);
+
+                if ($order->is_paid) throw new \Exception('Lab test already paid.');
+                if ($order->result) throw new \Exception('Result already entered.');
+
+                $order->delete();
+                $message = "Lab test removed.";
+            } elseif ($request->item_type === 'injection') {
+                $order = $visit->injectionOrders()->findOrFail($request->item_id);
+
+                if ($order->is_paid || $order->is_given) {
+                    throw new \Exception('Injection already processed.');
+                }
+
+                $order->delete();
+                $message = "Injection removed.";
+            }
+
+            $response = [
+                'success' => true,
+                'message' => $message
+            ];
+        });
+    } catch (\Exception $e) {
+        Log::error("Remove bill item failed", [
+            'error'   => $e->getMessage(),
+            'trace'   => $e->getTraceAsString(),
+            'request' => $request->all()
+        ]);
+
+        $response = [
+            'success' => false,
+            'message' => $e->getMessage() ?: 'Failed to remove item.'
+        ];
+    }
+
+    // Always return JSON with proper header
+    return response()->json($response)
+        ->header('Content-Type', 'application/json');
+}
     public function search(Request $request)
     {
         $q = trim($request->q);

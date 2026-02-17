@@ -81,6 +81,10 @@ Route::get('/patient-history/{patient}/data', [PatieController::class, 'historyD
 });
 
 //billing
+// In web.php
+Route::post('/billing/remove-item', [BillingController::class, 'removeItem'])
+    ->name('billing.remove-item')
+    ->middleware(['auth', 'role:Admin']);  // ← restrict to Admin
     Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
     Route::get('/billing/search', [BillingController::class, 'search'])->name('billing.search');
     Route::get('/billing/pending/{visit}', [BillingController::class, 'showBill'])->name('billing.pending.show');

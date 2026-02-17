@@ -45,7 +45,9 @@
         @include('patients.partials.patients-grid')
     </div>
 
-    <div class="mt-4">{{ $patients->links('pagination::bootstrap-5') }}</div>
+     <div class="mt-4" id="pagination-container">
+            {{ $patients->links('pagination::bootstrap-5') }}
+     </div>
 </div>
 
 <!-- Mobile FAB -->

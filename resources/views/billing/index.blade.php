@@ -54,69 +54,114 @@
                     </div>
 
                     <!-- Bill Table -->
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-striped align-middle">
-                            <thead class="table-primary">
-                                <tr>
-                                    <th style="width: 55%">Description</th>
-                                    <th class="text-center">Qty</th>
-                                    <th class="text-end">Unit Price</th>
-                                    <th class="text-end">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                               
+<div class="table-responsive">
+    <table class="table table-bordered table-striped align-middle">
+        <thead class="table-primary">
+            <tr>
+                <th style="width: 45%">Description</th>
+                <th class="text-center">Qty</th>
+                <th class="text-end">Unit Price</th>
+                <th class="text-end">Total</th>
+                @if(auth()->user()->hasRole('Admin'))
+                    <th class="text-center">Action</th>
+                @endif
+            </tr>
+        </thead>
+        <tbody>
 
-                                @foreach($medicines as $m)
-                                @php
-                                    $issuedQty = $m->pharmacyIssues->sum('quantity_issued') ?? 1;
-                                    $totalPrice = $issuedQty * $m->medicine->price;
-                                @endphp
-                                <tr>
-                                    <td>{{ $m->medicine->medicine_name }}</td>
-                                    <td class="text-center">{{ $issuedQty }}</td>
-                                    <td class="text-end">Tsh{{ number_format($m->medicine->price, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format($totalPrice, 0) }}</td>
-                                </tr>
-                                @endforeach
+            @foreach($medicines as $m)
+                @php
+                    $issuedQty = $m->pharmacyIssues->sum('quantity_issued') ?? 1;
+                    $totalPrice = $issuedQty * $m->medicine->price;
+                    $canRemoveMedicine = !$m->is_paid && !$m->is_issued;
+                @endphp
+                <tr>
+                    <td>
+                        {{ $m->medicine->medicine_name }}
+                        @if(!$canRemoveMedicine && auth()->user()->hasRole('Admin'))
+                            <span class="badge bg-secondary ms-2 small">Issued / Paid</span>
+                        @endif
+                    </td>
+                    <td class="text-center">{{ $issuedQty }}</td>
+                    <td class="text-end">Tsh{{ number_format($m->medicine->price, 0) }}</td>
+                    <td class="text-end">Tsh{{ number_format($totalPrice, 0) }}</td>
+                    @if(auth()->user()->hasRole('Admin'))
+                        <td class="text-center">
+                            @if($canRemoveMedicine)
+                                <button type="button" class="btn btn-sm btn-danger rounded-pill"
+                                        onclick="removeBillItem({{ $m->id }}, 'medicine', '{{ addslashes($m->medicine->medicine_name) }}')">
+                                    <i class="bi bi-trash me-1"></i> Remove
+                                </button>
+                            @endif
+                        </td>
+                    @endif
+                </tr>
+            @endforeach
 
-                                @foreach($labTests as $t)
-                                <tr>
-                                    <td>{{ $t->test->test_name }} (Lab Test)</td>
-                                    <td class="text-center">1</td>
-                                    <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
-                                </tr>
-                                @endforeach
+            @foreach($labTests as $t)
+                @php
+                    $canRemoveLab = !$t->is_paid;
+                @endphp
+                <tr>
+                    <td>{{ $t->test->test_name }} (Lab Test)</td>
+                    <td class="text-center">1</td>
+                    <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
+                    <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
+                    @if(auth()->user()->hasRole('Admin'))
+                        <td class="text-center">
+                            @if($canRemoveLab)
+                                <button type="button" class="btn btn-sm btn-danger rounded-pill"
+                                        onclick="removeBillItem({{ $t->id }}, 'lab', '{{ addslashes($t->test->test_name) }}')">
+                                    <i class="bi bi-trash me-1"></i> Remove
+                                </button>
+                            @else
+                                <span class="badge bg-secondary small">Paid</span>
+                            @endif
+                        </td>
+                    @endif
+                </tr>
+            @endforeach
 
-                                @foreach($injections as $i)
-                                <tr>
-                                    <td>{{ $i->medicine->medicine_name }} (Injection)</td>
-                                    <td class="text-center">1</td>
-                                    <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
-                                </tr>
-                                @endforeach
+            @foreach($injections as $i)
+                <tr>
+                    <td>{{ $i->medicine->medicine_name }} (Injection)</td>
+                    <td class="text-center">1</td>
+                    <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
+                    <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
+                    <!-- Add injection remove logic later if needed -->
+                    @if(auth()->user()->hasRole('Admin'))
+                        <td class="text-center">
+                            <span class="badge bg-secondary small">Locked</span>
+                        </td>
+                    @endif
+                </tr>
+            @endforeach
 
-                                @if($bedCharges > 0)
-                                <tr>
-                                    <td>Bed/Ward Charges ({{ $bedDays }} day{{ $bedDays > 1 ? 's' : '' }})</td>
-                                    <td class="text-center">1</td>
-                                    <td class="text-end">Tsh{{ number_format($bedCharges, 0) }}</td>
-                                    <td class="text-end">Tsh{{ number_format($bedCharges, 0) }}</td>
-                                </tr>
-                                @endif
-                            </tbody>
-                            <tfoot class="table-dark">
-                                <tr>
-                                    <th colspan="3" class="text-end fs-5">GRAND TOTAL</th>
-                                    <th class="text-end fs-4 fw-bold text-white">
-                                        Tsh{{ number_format($grandTotal, 0) }}
-                                    </th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+            @if($bedCharges > 0)
+                <tr>
+                    <td>Bed/Ward Charges ({{ $bedDays }} day{{ $bedDays > 1 ? 's' : '' }})</td>
+                    <td class="text-center">1</td>
+                    <td class="text-end">Tsh{{ number_format($bedCharges, 0) }}</td>
+                    <td class="text-end">Tsh{{ number_format($bedCharges, 0) }}</td>
+                    @if(auth()->user()->hasRole('Admin'))
+                        <td class="text-center">
+                            <span class="badge bg-secondary small">Locked</span>
+                        </td>
+                    @endif
+                </tr>
+            @endif
+
+        </tbody>
+        <tfoot class="table-dark">
+            <tr>
+                <th colspan="{{ auth()->user()->hasRole('Admin') ? 4 : 3 }}" class="text-end fs-5">GRAND TOTAL</th>
+                <th class="text-end fs-4 fw-bold text-white">
+                    Tsh{{ number_format($grandTotal, 0) }}
+                </th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
 
                     <!-- Generate Receipt Button -->
  <div class="text-center mt-5">
@@ -526,6 +571,97 @@ function loadPaymentDetails(visitId) {
         .catch(() => {
             document.getElementById('paymentDetailsBody').innerHTML = '<p class="text-danger">Failed to load data.</p>';
         });
+}
+
+function removeBillItem(itemId, type, name) {
+    Swal.fire({
+        title: 'Remove this item?',
+        html: `Are you sure you want to remove <strong>"${name}"</strong> from the bill?<br><br><small>This action cannot be undone.</small>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',      // red for danger
+        cancelButtonColor: '#6c757d',       // gray for cancel
+        confirmButtonText: 'Yes, Remove It',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true,               // puts Cancel on left
+        focusCancel: true
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (!csrfToken) {
+            Swal.fire({
+                icon: 'error',
+                title: 'CSRF Error',
+                text: 'CSRF token missing. Please refresh the page.',
+            });
+            return;
+        }
+
+        // Show loading state
+        Swal.fire({
+            title: 'Removing...',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch("{{ route('billing.remove-item') }}", {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                visit_id: {{ $visit->id ?? 'null' }},
+                item_id: itemId,
+                item_type: type
+            })
+        })
+        .then(async response => {
+            console.log('Remove status:', response.status);
+
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Non-OK body:', text.substring(0, 300));
+                throw new Error(`Server error ${response.status}`);
+            }
+
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: data.message || 'Item removed',
+                    showConfirmButton: false,
+                    timer: 2500,
+                    timerProgressBar: true
+                }).then(() => {
+                    location.reload(); // Refresh to show updated bill
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Failed',
+                    text: data.message || 'Could not remove the item. Please try again.'
+                });
+            }
+        })
+        .catch(err => {
+            console.error('Fetch error:', err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Connection Error',
+                text: 'Failed to connect to server.\nItem may still be removed — please refresh to check.'
+            });
+        });
+    });
 }
 </script>
 @endsection
