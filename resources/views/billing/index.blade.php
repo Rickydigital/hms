@@ -574,93 +574,50 @@ function loadPaymentDetails(visitId) {
 }
 
 function removeBillItem(itemId, type, name) {
-    Swal.fire({
-        title: 'Remove this item?',
-        html: `Are you sure you want to remove <strong>"${name}"</strong> from the bill?<br><br><small>This action cannot be undone.</small>`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc3545',      // red for danger
-        cancelButtonColor: '#6c757d',       // gray for cancel
-        confirmButtonText: 'Yes, Remove It',
-        cancelButtonText: 'Cancel',
-        reverseButtons: true,               // puts Cancel on left
-        focusCancel: true
-    }).then((result) => {
-        if (!result.isConfirmed) return;
+    if (!confirm(`Remove "${name}"?\nThis cannot be undone.`)) return;
 
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        if (!csrfToken) {
-            Swal.fire({
-                icon: 'error',
-                title: 'CSRF Error',
-                text: 'CSRF token missing. Please refresh the page.',
-            });
-            return;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!csrfToken) {
+        alert('CSRF token missing – page needs refresh or layout broken.');
+        return;
+    }
+
+    fetch("{{ route('billing.remove-item') }}", {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            visit_id: {{ $visit->id ?? 'null' }},
+            item_id: itemId,
+            item_type: type
+        })
+    })
+    .then(async response => {
+        console.log('Status:', response.status); // ← debug
+
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('Non-OK response body:', text.substring(0, 300));
+            throw new Error(`Server error ${response.status}`);
         }
 
-        // Show loading state
-        Swal.fire({
-            title: 'Removing...',
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-
-        fetch("{{ route('billing.remove-item') }}", {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                visit_id: {{ $visit->id ?? 'null' }},
-                item_id: itemId,
-                item_type: type
-            })
-        })
-        .then(async response => {
-            console.log('Remove status:', response.status);
-
-            if (!response.ok) {
-                const text = await response.text();
-                console.error('Non-OK body:', text.substring(0, 300));
-                throw new Error(`Server error ${response.status}`);
-            }
-
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: data.message || 'Item removed',
-                    showConfirmButton: false,
-                    timer: 2500,
-                    timerProgressBar: true
-                }).then(() => {
-                    location.reload(); // Refresh to show updated bill
-                });
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Failed',
-                    text: data.message || 'Could not remove the item. Please try again.'
-                });
-            }
-        })
-        .catch(err => {
-            console.error('Fetch error:', err);
-            Swal.fire({
-                icon: 'error',
-                title: 'Connection Error',
-                text: 'Failed to connect to server.\nItem may still be removed — please refresh to check.'
-            });
-        });
+        const data = await response.json();
+        return data;
+    })
+    .then(data => {
+        if (data.success) {
+            alert(data.message || 'Removed successfully!');
+            location.reload();
+        } else {
+            alert(data.message || 'Failed – check message');
+        }
+    })
+    .catch(err => {
+        console.error('Fetch error:', err);
+        alert('Connection/Response error – but item may still be removed (refresh to check).');
     });
 }
 </script>
