@@ -84,9 +84,18 @@ class BillingController extends Controller
                         $issues = $order->pharmacyIssues;
 
                         foreach ($issues as $issue) {
-                            MedicineBatch::where('medicine_id', $issue->medicine_id)
+                            $batch = MedicineBatch::where('medicine_id', $issue->medicine_id)
                                 ->where('batch_no', $issue->batch_no)
-                                ->increment('current_stock', $issue->quantity_issued);
+                                ->first();
+
+                            if ($batch) {
+                                $batch->logStockChange(
+                                    $issue->quantity_issued,
+                                    'restored',
+                                    $order,
+                                    'Medicine removed from billing - stock restored'
+                                );
+                            }
 
                             $issue->delete();
                         }

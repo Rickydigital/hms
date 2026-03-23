@@ -44,25 +44,26 @@ class MedicineBatch extends Model {
     }
 
     public function logStockChange($quantity, $type, $reference = null, $remarks = null)
-    {
-        $before = $this->current_stock;
-        $after  = $before + $quantity; 
+{
+    $this->refresh(); // ensure latest value
 
-        \App\Models\MedicineStockLog::create([
-            'medicine_id'     => $this->medicine_id,
-            'batch_id'        => $this->id,
-            'quantity'        => $quantity,           
-            'stock_before'    => $before,
-            'stock_after'     => $after,
-            'type'            => $type,
-            'reference_type'  => $reference ? $reference::class : null,
-            'reference_id'    => $reference?->id,
-            'remarks'         => $remarks,
-            'created_by'      => Auth::id() ?? 1,
-        ]);
+    $before = $this->current_stock;
+    $after  = $before + $quantity;
 
-        // Now actually update stock
-        $this->increment('current_stock', $quantity); 
-    }
+    \App\Models\MedicineStockLog::create([
+        'medicine_id'     => $this->medicine_id,
+        'batch_id'        => $this->id,
+        'quantity'        => $quantity,
+        'stock_before'    => $before,
+        'stock_after'     => $after,
+        'type'            => $type,
+        'reference_type'  => $reference ? $reference::class : null,
+        'reference_id'    => $reference?->id,
+        'remarks'         => $remarks,
+        'created_by'      => Auth::id() ?? 1,
+    ]);
+
+    $this->increment('current_stock', $quantity);
+}
    
 }
