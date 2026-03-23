@@ -91,7 +91,7 @@ class BillingController extends Controller
                             if ($batch) {
                                 $batch->logStockChange(
                                     $issue->quantity_issued,
-                                    'restored',
+                                    'return',
                                     $order,
                                     'Medicine removed from billing - stock restored'
                                 );
