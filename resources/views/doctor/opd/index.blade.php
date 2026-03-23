@@ -299,6 +299,91 @@
                             </div>
                         @endif
 
+                        {{-- COMPLETED PROCEDURES --}}
+@if($visit->procedureOrders->where('is_issued', true)->count() > 0)
+    <div class="card mb-5 border-0 shadow-lg rounded-4">
+        <div class="card-header bg-gradient-purple text-white py-4 rounded-top-4">
+            <h5 class="mb-0">Completed Procedures • {{ $visit->procedureOrders->where('is_issued', true)->count() }} Issued</h5>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-4">
+                @foreach($visit->procedureOrders->where('is_issued', true) as $order)
+                    <div class="col-md-6 col-lg-4">
+                        <div class="border rounded-4 p-4 shadow-sm {{ $order->is_paid && $order->is_issued ? 'border-success bg-light' : 'border-warning bg-warning-subtle' }}">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <h6 class="fw-bold text-purple mb-0">{{ $order->procedure->procedure_name }}</h6>
+                                @if($order->is_paid)
+                                    <span class="badge bg-success fs-6">PAID</span>
+                                @else
+                                    <span class="badge bg-danger fs-6">NOT PAID</span>
+                                @endif
+                            </div>
+                            <div>
+                                @if($order->extra_instruction)
+                                    <small class="text-info d-block mb-2">{{ $order->extra_instruction }}</small>
+                                @endif
+                                <small class="text-muted">
+                                    Issued at: {{ $order->issued_at?->format('d M Y • h:i A') ?? '—' }}
+                                </small>
+                                <br>
+                                <small class="text-muted">
+                                    By: {{ $order->paidBy?->name ?? '—' }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
+
+{{-- PENDING PROCEDURES --}}
+@if($visit->procedureOrders->where('is_issued', false)->count() > 0)
+    <div class="card mb-5 border-0 shadow-sm {{ $visit->procedureOrders->where('is_issued', false)->where('is_paid', false)->count() > 0 ? 'border-danger' : 'border-warning' }}">
+        <div class="card-header {{ $visit->procedureOrders->where('is_issued', false)->where('is_paid', false)->count() > 0 ? 'bg-danger' : 'bg-warning' }} text-white py-3">
+            <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                Pending Procedures ({{ $visit->procedureOrders->where('is_issued', false)->count() }})
+                @if($visit->procedureOrders->where('is_issued', false)->where('is_paid', false)->count() > 0)
+                    <span class="badge bg-white text-danger fs-6">Payment Required</span>
+                @else
+                    <span class="badge bg-white text-dark fs-6">Paid • Awaiting Issue</span>
+                @endif
+            </h6>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-3">
+                @foreach($visit->procedureOrders->where('is_issued', false) as $order)
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center p-3 rounded-3 {{ $order->is_paid ? 'bg-light' : 'bg-danger bg-opacity-10' }} border-start {{ $order->is_paid ? 'border-success' : 'border-danger' }} border-5">
+                            <div class="flex-grow-1">
+                                <strong>{{ $order->procedure->procedure_name }}</strong>
+                                @if($order->extra_instruction)
+                                    <br><small class="text-info">{{ $order->extra_instruction }}</small>
+                                @endif
+                            </div>
+                            <div>
+                                @if($order->is_paid)
+                                    <span class="badge bg-success">PAID</span>
+                                @else
+                                    <span class="badge bg-danger">NOT PAID</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            @if($visit->procedureOrders->where('is_issued', false)->where('is_paid', false)->count() > 0)
+                <div class="alert alert-danger mt-4 mb-0">
+                    <strong>Important:</strong> Patient must pay at the billing counter before procedure can be issued.
+                </div>
+            @endif
+        </div>
+    </div>
+@endif
+
+
                         <form action="{{ route('doctor.prescription.store', $visit) }}" method="POST" id="prescriptionForm">
                             @csrf
 
@@ -353,6 +438,37 @@
             </button>
             
             <textarea name="lab_instruction" class="form-control mt-3" rows="2" placeholder="Special instruction for lab..."></textarea>
+        </div>
+    </div>
+</div>
+
+<!-- PROCEDURES -->
+<div class="col-md-6">
+    <div class="card">
+        <div class="card-body">
+            <h6 class="section-title text-purple">Procedures (Optional)</h6>
+            <div id="procedureContainer">
+                <template id="procedureTemplate">
+                    <div class="prescription-item position-relative mb-3 p-3 bg-light rounded-3 border">
+                        <button type="button" class="remove-prescription position-absolute top-0 end-0 btn btn-sm btn-danger rounded-circle m-2">×</button>
+                        
+                        <select name="procedures[]" class="form-select form-select-lg select2-procedure" multiple="multiple" style="width: 100%;">
+                            <option value="">Search procedures...</option>
+                            @foreach(\App\Models\ProcedureMaster::active()->orderBy('procedure_name')->get() as $proc)
+                                <option value="{{ $proc->id }}" data-price="{{ $proc->price }}">
+                                    {{ $proc->procedure_name }} — {{ number_format($proc->price) }} Tsh
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </template>
+            </div>
+            
+            <button type="button" id="addProcedure" class="btn btn-purple rounded-pill px-5 py-3 mt-3 shadow">
+                Add Procedure
+            </button>
+            
+            <textarea name="procedure_instruction" class="form-control mt-3" rows="2" placeholder="Special instruction for procedures..."></textarea>
         </div>
     </div>
 </div>
@@ -523,6 +639,32 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+
+    // Add Procedure Row + Initialize Select2
+document.getElementById('addProcedure')?.addEventListener('click', function () {
+    const template = document.getElementById('procedureTemplate').content.cloneNode(true);
+    const item = template.querySelector('.prescription-item');
+    document.getElementById('procedureContainer').appendChild(item);
+
+    // Initialize Select2 on the new procedure select
+    $(item).find('.select2-procedure').select2({
+        placeholder: "Search and select procedures...",
+        allowClear: true,
+        width: '100%',
+        templateResult: formatProcedureOption,
+        templateSelection: formatProcedureSelection
+    });
+});
+
+// Optional: Custom formatting for procedures (like lab)
+function formatProcedureOption(option) {
+    if (!option.id) return option.text;
+    return $('<span>' + option.text + '</span>');
+}
+
+function formatProcedureSelection(option) {
+    return option.text || 'No procedures selected';
+}
     function toggleAdmissionField() {
         if (wardSelect.value) {
             admissionReason.removeAttribute('readonly');

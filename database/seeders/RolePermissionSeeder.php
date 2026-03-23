@@ -40,42 +40,36 @@ class RolePermissionSeeder extends Seeder
             'manage wards', 'manage store items', 'manage suppliers', 'manage settings',
 
             // Reports
-            'view daily collection', 'view stock report', 'view expiry report',
+            'view daily collection', 'view stock report', 'view expiry report', 'manage procedures'
         ];
 
+        // Create permissions if they don't exist
         foreach ($permissions as $perm) {
             Permission::firstOrCreate(['name' => $perm]);
         }
 
         // ==================== ROLES + PERMISSIONS ====================
-        Role::firstOrCreate(['name' => 'Admin'])->givePermissionTo(Permission::all());
+        $rolesPermissions = [
+            'Admin' => Permission::all()->pluck('name')->toArray(),
+            'Reception' => [
+                'view patients', 'create patient', 'edit patient', 'reactivate patient',
+                'view visits', 'create visit', 'add vitals', 'collect registration',
+                'generate final bill', 'print receipt',
+            ],
+            'Doctor' => [
+                'view patients', 'view visits', 'prescribe medicine', 'order lab tests',
+                'admit patient', 'discharge patient', 'manage procedures',
+            ],
+            'Lab' => ['enter lab results', 'issue store items'],
+            'Pharmacy' => ['issue medicine', 'issue injection', 'issue store items'],
+            'Cashier' => ['generate final bill', 'print receipt'],
+            'Store' => ['issue store items'],
+        ];
 
-        Role::firstOrCreate(['name' => 'Reception'])->syncPermissions([
-            'view patients', 'create patient', 'edit patient', 'reactivate patient',
-            'view visits', 'create visit', 'add vitals', 'collect registration',
-            'generate final bill', 'print receipt',
-        ]);
-
-        Role::firstOrCreate(['name' => 'Doctor'])->syncPermissions([
-            'view patients', 'view visits', 'prescribe medicine', 'order lab tests',
-            'admit patient', 'discharge patient',
-        ]);
-
-        Role::firstOrCreate(['name' => 'Lab'])->syncPermissions([
-            'enter lab results', 'issue store items',
-        ]);
-
-        Role::firstOrCreate(['name' => 'Pharmacy'])->syncPermissions([
-            'issue medicine', 'issue injection', 'issue store items',
-        ]);
-
-        Role::firstOrCreate(['name' => 'Cashier'])->syncPermissions([
-            'generate final bill', 'print receipt',
-        ]);
-
-        Role::firstOrCreate(['name' => 'Store'])->syncPermissions([
-            'issue store items',
-        ]);
+        foreach ($rolesPermissions as $roleName => $perms) {
+            $role = Role::firstOrCreate(['name' => $roleName]);
+            $role->givePermissionTo($perms); // Add permissions without removing existing ones
+        }
 
         // ==================== ADMIN USER ====================
         $admin = User::updateOrCreate(
@@ -85,7 +79,7 @@ class RolePermissionSeeder extends Seeder
                 'name'          => 'Administrator',
                 'phone'         => '0624592725',
                 'department'    => 'Admin',
-                'password'      => bcrypt('admin123'), // Change after first login!
+                'password'      => bcrypt('admin123'),
                 'is_active'     => true,
             ]
         );
@@ -93,6 +87,6 @@ class RolePermissionSeeder extends Seeder
         $admin->assignRole('Admin');
 
         $this->command->info('Roles & Permissions seeded successfully!');
-        $this->command->info('Admin Login → Email: admin@carewell.com | Password: admin123');
+        $this->command->info('Admin Login → Email: admin@mana.com | Password: admin123');
     }
 }

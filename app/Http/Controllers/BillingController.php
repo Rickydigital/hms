@@ -8,6 +8,7 @@ use App\Models\PaymentDetail;
 use App\Models\Visit;
 use App\Models\VisitLabOrder;
 use App\Models\VisitMedicineOrder;
+use App\Models\VisitProcedure; // ← PROCEDURE
 use App\Models\Receipt;
 use App\Models\Setting;
 use Illuminate\Http\Request;
@@ -19,25 +20,27 @@ class BillingController extends Controller
 {
     public function index()
     {
-        // PENDING BILLS: Visits with ANY unpaid services (lab or medicine)
+        // PENDING BILLS: Visits with ANY unpaid services (lab, medicine, procedures)
         $pendingVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
-                // Has lab orders that are not paid
-                $q->whereHas('labOrders', function ($sq) {
-                    $sq->where('is_paid', false);
-                })
-                    // OR has medicine orders that are not issued OR not paid
-                    ->orWhereHas('medicineOrders', function ($sq) {
-                        $sq->where('is_issued', true)
-                            ->where('is_paid', false);
-                    });
+                $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false)->orWhere('is_paid', false))
+                  ->orWhereHas('injectionOrders')
+                  ->orWhereHas('bedAdmission')
+                  ->orWhereHas('procedures', fn($sq) => $sq->where('is_paid', false)); // PROCEDURE
             })
             ->latest('visit_date')
             ->paginate(20);
 
         // IN PROGRESS: Visits with services but not fully completed/paid
         $inProgressVisits = Visit::with(['patient', 'doctor'])
-            ->where('status', 'in_progress')
+            ->where(function ($q) {
+                $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
+                  ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
+                  ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false))
+                  ->orWhereHas('procedures', fn($sq) => $sq->where('is_issued', false)); // PROCEDURE
+            })
             ->latest('visit_date')
             ->get();
 
@@ -48,8 +51,7 @@ class BillingController extends Controller
         $pendingCount = $pendingVisits->total();
 
         return view('billing.index', compact(
-            'pendingVisits',
-            'pendingCount',
+            'pendingVisits', 'pendingCount',
             'inProgressVisits',
             'receipts'
         ));
@@ -60,7 +62,7 @@ class BillingController extends Controller
         $validated = $request->validate([
             'visit_id'  => 'required|exists:visits,id',
             'item_id'   => 'required|integer',
-            'item_type' => 'required|in:medicine,lab,injection',
+            'item_type' => 'required|in:medicine,lab,injection,procedure', // PROCEDURE
         ]);
 
         $response = ['success' => false, 'message' => 'Unknown error'];
@@ -74,43 +76,22 @@ class BillingController extends Controller
                 if ($request->item_type === 'medicine') {
                     $order = $visit->medicineOrders()->findOrFail($request->item_id);
 
-                    // ❌ Prevent removing if already PAID
-                    if ($order->is_paid) {
-                        throw new \Exception('Cannot remove: medicine already paid.');
+                    if ($order->is_issued) {
+                        throw new \Exception('Cannot remove: medicine already issued.');
                     }
 
-                    // 🔄 If issued → restore stock
-                    if ($order->is_issued) {
-                        $issues = $order->pharmacyIssues;
-
-                        foreach ($issues as $issue) {
-                            $batch = MedicineBatch::where('medicine_id', $issue->medicine_id)
-                                ->where('batch_no', $issue->batch_no)
-                                ->first();
-
-                            if ($batch) {
-                                $batch->logStockChange(
-                                    $issue->quantity_issued,
-                                    'return',
-                                    $order,
-                                    'Medicine removed from billing - stock restored'
-                                );
-                            }
-
-                            $issue->delete();
-                        }
+                    $issues = $order->pharmacyIssues;
+                    foreach ($issues as $issue) {
+                        MedicineBatch::where('medicine_id', $issue->medicine_id)
+                            ->where('batch_no', $issue->batch_no)
+                            ->increment('current_stock', $issue->quantity_issued);
+                        $issue->delete();
                     }
 
                     $medicineName = $order->medicine->medicine_name;
-
-                    // ❌ Reset flags (optional but clean)
-                    $order->is_issued = false;
-                    $order->save();
-
-                    // 🗑️ Delete order
                     $order->delete();
 
-                    $message = "Medicine '{$medicineName}' removed. Stock restored if issued.";
+                    $message = "Medicine '{$medicineName}' removed. Stock restored.";
                 } elseif ($request->item_type === 'lab') {
                     $order = $visit->labOrders()->findOrFail($request->item_id);
 
@@ -128,6 +109,15 @@ class BillingController extends Controller
 
                     $order->delete();
                     $message = "Injection removed.";
+                } elseif ($request->item_type === 'procedure') { // PROCEDURE
+                    $order = $visit->procedures()->findOrFail($request->item_id);
+
+                    if ($order->is_paid || $order->is_issued) {
+                        throw new \Exception('Procedure already processed.');
+                    }
+
+                    $order->delete();
+                    $message = "Procedure removed.";
                 }
 
                 $response = [
@@ -148,28 +138,29 @@ class BillingController extends Controller
             ];
         }
 
-        // Always return JSON with proper header
         return response()->json($response)
             ->header('Content-Type', 'application/json');
     }
+
     public function search(Request $request)
     {
         $q = trim($request->q);
 
         $visit = Visit::with([
-            'patient',
-            'doctor',
-            'medicineIssues.medicine',
-            'labOrders.test',
-            'injectionOrders.medicine',
-            'bedAdmission.ward'
-        ])
+                'patient',
+                'doctor',
+                'medicineIssues.medicine',
+                'labOrders.test',
+                'injectionOrders.medicine',
+                'procedures.procedure', // PROCEDURE
+                'bedAdmission.ward'
+            ])
             ->where(function ($query) use ($q) {
                 $query->whereHas('patient', function ($sq) use ($q) {
                     $sq->where('patient_id', 'like', "%$q%")
-                        ->orWhere('name', 'like', "%$q%");
+                       ->orWhere('name', 'like', "%$q%");
                 })
-                    ->orWhere('id', $q);
+                ->orWhere('id', $q);
             })
             ->firstOrFail();
 
@@ -183,74 +174,63 @@ class BillingController extends Controller
 
     private function calculateBill($visit)
     {
-        // === NO REGISTRATION OR CONSULTATION FEES ANYMORE ===
-        // These are completely removed from billing
-
-        // 1. Medicines: Only issued ones, with correct issued quantity
-        // 1. Medicines: Only issued AND unpaid ones
+        // Medicines: Only issued AND unpaid
         $medicines = $visit->medicineOrders()
-            ->where('is_issued', true)
-            ->where('is_paid', false)  // ← CRITICAL: Only unpaid
+            ->where('is_issued', false)
+            ->where('is_paid', false)
             ->with(['medicine', 'pharmacyIssues'])
             ->get();
 
-        // 2. Lab Tests: Only unpaid ones
+        // Lab Tests: Only unpaid
         $labTests = $visit->labOrders()
             ->where('is_paid', false)
             ->with('test')
             ->get();
 
-        // 3. Injections: Only given ones
+        // Injections: Only given
         $injections = $visit->injectionOrders()
             ->where('is_given', true)
             ->with('medicine')
             ->get();
 
-        // 4. Bed/Ward charges
+        // PROCEDURES: Only issued AND unpaid
+        $procedures = $visit->procedures()
+            ->where('is_issued', false)
+            ->where('is_paid', false)
+            ->with('procedure')
+            ->get();
+
+        // Bed/Ward charges
         $bedAdmission = $visit->bedAdmission()->where('is_discharged', true)->first();
         $bedCharges = $bedAdmission?->bed_charges ?? 0;
         $bedDays    = $bedAdmission?->total_days ?? 0;
 
-        // We no longer need to check for receipt to show reg/consult
-        // $hasReceipt = $visit->receipt()->exists();
-        // $showRegConsult = !$hasReceipt;
+        $showRegConsult = false; // No registration/consultation fees
 
-        // Force false - no reg/consult fees will ever be shown or added
-        $showRegConsult = false;
-
-        // === CALCULATE GRAND TOTAL - ONLY ACTUAL SERVICES ===
+        // Grand total
         $grandTotal = 0;
-
-        // Medicines (using actual issued quantity)
-        $grandTotal += $medicines->sum(function ($order) {
-            $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
-            return $issuedQty * $order->medicine->price;
-        });
-
-        // Unpaid lab tests
+        $grandTotal += $medicines->sum(fn($order) => ($order->pharmacyIssues->sum('quantity_issued') ?? 1) * $order->medicine->price);
         $grandTotal += $labTests->sum(fn($t) => $t->test->price);
-
-        // Injections
         $grandTotal += $injections->sum(fn($i) => $i->medicine->price);
-
-        // Bed charges
+        $grandTotal += $procedures->sum(fn($p) => $p->procedure->price); // PROCEDURE
         $grandTotal += $bedCharges;
 
-        // === DETERMINE IF GENERATE BUTTON SHOULD BE SHOWN ===
         $hasUnpaidItems = $medicines->isNotEmpty()
             || $labTests->isNotEmpty()
             || $injections->isNotEmpty()
-            || $bedCharges > 0;
+            || $bedCharges > 0
+            || $procedures->isNotEmpty(); // PROCEDURE
 
         $showGenerateButton = $hasUnpaidItems && $grandTotal > 0;
 
-        // === SIDEBAR DATA (Pending, In Progress, Receipts) ===
+        // Sidebar data
         $pendingVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
                 $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
-                    ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false)->orWhere('is_paid', false))
-                    ->orWhereHas('injectionOrders')
-                    ->orWhereHas('bedAdmission');
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false)->orWhere('is_paid', false))
+                  ->orWhereHas('injectionOrders')
+                  ->orWhereHas('bedAdmission')
+                  ->orWhereHas('procedures', fn($sq) => $sq->where('is_paid', false)); // PROCEDURE
             })
             ->latest('visit_date')
             ->paginate(20);
@@ -260,9 +240,10 @@ class BillingController extends Controller
         $inProgressVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
                 $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
-                    ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
-                    ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
-                    ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false));
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
+                  ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
+                  ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false))
+                  ->orWhereHas('procedures', fn($sq) => $sq->where('is_issued', false)); // PROCEDURE
             })
             ->latest('visit_date')
             ->get();
@@ -271,12 +252,12 @@ class BillingController extends Controller
             ->latest('generated_at')
             ->get();
 
-        // === RETURN VIEW WITH CLEANED VARIABLES ===
         return view('billing.index', compact(
             'visit',
             'medicines',
             'labTests',
             'injections',
+            'procedures', // PROCEDURE
             'bedCharges',
             'bedDays',
             'grandTotal',
@@ -285,20 +266,13 @@ class BillingController extends Controller
             'pendingCount',
             'inProgressVisits',
             'receipts'
-            // 'regFee', 'consultFee', 'showRegConsult' → removed entirely
         ));
     }
 
     public function generateReceipt(Request $request, Visit $visit)
     {
-
-
-        Log::info("BillingController@generateReceipt - Attempting to generate receipt for visit ID: {$visit->id}");
-
         $view = $this->calculateBill($visit);
         $data = $view->getData();
-
-        Log::info("BillingController@generateReceipt - Grand Total: {$data['grandTotal']}");
 
         $recentPayment = $visit->payments()
             ->where('amount', $data['grandTotal'])
@@ -309,18 +283,15 @@ class BillingController extends Controller
             return redirect()->route('billing.index')
                 ->with('warning', 'Receipt already generated recently. Avoiding duplicate.');
         }
+
         if ($data['grandTotal'] <= 0) {
-            Log::warning("BillingController@generateReceipt - No amount to bill for visit {$visit->id}");
             return back()->with('error', 'No pending amount to generate receipt.');
         }
 
         try {
-            // Generate receipt number
             $year = now()->format('Y');
             $count = Receipt::whereYear('generated_at', $year)->count() + 1;
             $receiptNo = "RCPT{$year}-" . str_pad($count, 6, '0', STR_PAD_LEFT);
-
-            Log::info("BillingController@generateReceipt - Creating receipt #{$receiptNo}");
 
             $receipt = Receipt::create([
                 'visit_id'     => $visit->id,
@@ -330,9 +301,6 @@ class BillingController extends Controller
                 'generated_at' => now(),
             ]);
 
-            Log::info("Receipt created ID: {$receipt->id}");
-
-            // Create payment record
             $payment = Payment::create([
                 'visit_id'       => $visit->id,
                 'amount'         => $data['grandTotal'],
@@ -342,12 +310,9 @@ class BillingController extends Controller
                 'paid_at'        => now(),
             ]);
 
-            Log::info("BillingController@generateReceipt - Payment created ID: {$payment->id}");
-
-            // Save payment details
             $details = [];
 
-            // Save payment details - Medicines (correct quantity)
+            // Medicines
             foreach ($data['medicines'] as $order) {
                 $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
                 $price = $order->medicine->price;
@@ -361,7 +326,6 @@ class BillingController extends Controller
                     'total_price' => $total,
                 ];
 
-                // Mark order as paid
                 $order->update([
                     'is_paid' => true,
                     'paid_at' => now(),
@@ -369,6 +333,7 @@ class BillingController extends Controller
                 ]);
             }
 
+            // Lab Tests
             foreach ($data['labTests'] as $test) {
                 $details[] = [
                     'item_type'   => 'lab_test',
@@ -385,17 +350,54 @@ class BillingController extends Controller
                 ]);
             }
 
+            // PROCEDURES
+            foreach ($data['procedures'] as $proc) {
+                $details[] = [
+                    'item_type'   => 'procedure',
+                    'item_name'   => $proc->procedure->name . ' (Procedure)',
+                    'quantity'    => 1,
+                    'unit_price'  => $proc->procedure->price,
+                    'total_price' => $proc->procedure->price,
+                ];
+
+                $proc->update([
+                    'is_paid' => true,
+                    'paid_at' => now(),
+                    'paid_by' => Auth::id(),
+                ]);
+            }
+
+            // Injections
+            foreach ($data['injections'] as $inj) {
+                $details[] = [
+                    'item_type'   => 'injection',
+                    'item_name'   => $inj->medicine->medicine_name . ' (Injection)',
+                    'quantity'    => 1,
+                    'unit_price'  => $inj->medicine->price,
+                    'total_price' => $inj->medicine->price,
+                ];
+            }
+
+            // Bed charges
+            if ($data['bedCharges'] > 0) {
+                $details[] = [
+                    'item_type'   => 'bed_charges',
+                    'item_name'   => 'Bed/Ward Charges (' . $data['bedDays'] . ' days)',
+                    'quantity'    => 1,
+                    'unit_price'  => $data['bedCharges'],
+                    'total_price' => $data['bedCharges'],
+                ];
+            }
+
             foreach ($details as $detail) {
                 PaymentDetail::create(array_merge($detail, ['payment_id' => $payment->id]));
             }
 
-            Log::info("BillingController@generateReceipt - Receipt #{$receiptNo} and payment recorded successfully for visit {$visit->id}");
+            return redirect()->route('billing.index')
+                ->with('success', "Receipt {$receiptNo} generated and payment recorded successfully!");
 
-            return redirect()->route('billing.index')->with('success', "Receipt {$receiptNo} generated and payment recorded successfully!");
         } catch (\Exception $e) {
-            Log::error("BillingController@generateReceipt - ERROR for visit {$visit->id}: " . $e->getMessage());
-            Log::error($e->getTraceAsString());
-
+            Log::error("BillingController@generateReceipt - ERROR: " . $e->getMessage());
             return back()->with('error', 'Failed to generate receipt. Check logs.');
         }
     }
@@ -428,30 +430,7 @@ class BillingController extends Controller
 
             $details = [];
 
-            // Registration & Consultation (only if shown)
-            if ($data['showRegConsult'] ?? false) {
-                if ($data['regFee'] > 0) {
-                    $details[] = [
-                        'item_type'   => 'registration',
-                        'item_name'   => 'Registration Fee',
-                        'quantity'    => 1,
-                        'unit_price'  => $data['regFee'],
-                        'total_price' => $data['regFee'],
-                    ];
-                }
-                if ($data['consultFee'] > 0) {
-                    $details[] = [
-                        'item_type'   => 'consultation',
-                        'item_name'   => 'Doctor Consultation - Dr. ' . ($visit->doctor->name ?? 'Unknown'),
-                        'quantity'    => 1,
-                        'unit_price'  => $data['consultFee'],
-                        'total_price' => $data['consultFee'],
-                    ];
-                }
-            }
-
-            // Medicines - Use pharmacy_issues for correct quantity
-            // Medicines - Use pharmacy_issues for correct quantity
+            // Medicines
             foreach ($data['medicines'] as $order) {
                 $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
                 $price = $order->medicine->price;
@@ -465,7 +444,6 @@ class BillingController extends Controller
                     'total_price' => $total,
                 ];
 
-                // Mark as paid
                 $order->update([
                     'is_paid' => true,
                     'paid_at' => now(),
@@ -484,6 +462,23 @@ class BillingController extends Controller
                 ];
 
                 $test->update([
+                    'is_paid' => true,
+                    'paid_at' => now(),
+                    'paid_by' => Auth::id(),
+                ]);
+            }
+
+            // PROCEDURES
+            foreach ($data['procedures'] as $proc) {
+                $details[] = [
+                    'item_type'   => 'procedure',
+                    'item_name'   => $proc->procedure->name . ' (Procedure)',
+                    'quantity'    => 1,
+                    'unit_price'  => $proc->procedure->price,
+                    'total_price' => $proc->procedure->price,
+                ];
+
+                $proc->update([
                     'is_paid' => true,
                     'paid_at' => now(),
                     'paid_by' => Auth::id(),
@@ -512,15 +507,14 @@ class BillingController extends Controller
                 ];
             }
 
-            // Save all details
             foreach ($details as $detail) {
                 PaymentDetail::create(array_merge($detail, ['payment_id' => $payment->id]));
             }
 
             return back()->with('success', "Payment of Tsh " . number_format($request->amount, 0) . " recorded successfully!");
+
         } catch (\Exception $e) {
             Log::error("recordPayment ERROR: " . $e->getMessage());
-            Log::error($e->getTraceAsString());
             return back()->with('error', 'Payment failed. Please try again.');
         }
     }

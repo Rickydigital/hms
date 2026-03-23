@@ -48,6 +48,15 @@
             </a>
             @endcan
 
+            @can('manage procedures')
+            <li>
+                <a href="{{ route('procedures.index') }}" class="waves-effect {{ request()->is('procedures*') ? 'active' : '' }}">
+                    <i class="bi bi-clipboard-check text-success"></i>
+                    <span>Manage Procedures</span>
+                </a>
+            </li>
+            @endcan
+
             @can('issue store items')
             <a href="{{ route('store.purchase.index') }}" class="nav-item {{ request()->is('store*') ? 'active' : '' }}">
                 <i class="bi bi-box-seam"></i>
@@ -129,6 +138,15 @@
                     <a href="{{ route('lab.index') }}" class="waves-effect {{ request()->is('lab*') ? 'active' : '' }}">
                         <i class="bi bi-eyedropper text-purple"></i>
                         <span>Laboratory</span>
+                    </a>
+                </li>
+                @endcan
+
+                @can('manage procedures')
+                <li>
+                    <a href="{{ route('procedures.index') }}" class="waves-effect {{ request()->is('procedures*') ? 'active' : '' }}">
+                        <i class="bi bi-clipboard-check text-success"></i>
+                        <span>Manage Procedures</span>
                     </a>
                 </li>
                 @endcan

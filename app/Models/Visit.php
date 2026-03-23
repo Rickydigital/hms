@@ -52,6 +52,16 @@ class Visit extends Model
         return $this->hasMany(VisitLabOrder::class);
     }
 
+    public function procedureOrders()
+    {
+        return $this->hasMany(VisitProcedure::class, 'visit_id');
+    }
+
+     public function procedures()
+    {
+        return $this->hasMany(VisitProcedure::class, 'visit_id');
+    }
+
     public function medicineOrders()
     {
         return $this->hasMany(VisitMedicineOrder::class);

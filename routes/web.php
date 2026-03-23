@@ -19,6 +19,14 @@ use App\Http\Controllers\PatieController;
 use App\Http\Controllers\PharmacyController;
 use App\Http\Controllers\PharmacySaleController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ProcedureController;
+use App\Http\Controllers\Admin\AdminProcedureMasterController;
+
+Route::prefix('admin/procedures')->name('admin.procedures.')->middleware(['auth', 'permission:manage procedures'])->group(function () {
+    Route::get('/', [AdminProcedureMasterController::class, 'index'])->name('index');
+    Route::post('/store', [AdminProcedureMasterController::class, 'store'])->name('store');
+    Route::post('/{procedure}/update', [AdminProcedureMasterController::class, 'update'])->name('update');
+});
 
 Route::get('/', function () {
     return view('auth.login');
@@ -33,6 +41,16 @@ Route::get('/check-time', function () {
         'current_time_eat'  => now()->timezone('Africa/Dar_es_Salaam')->toDateTimeString(),
         'utc_time'          => now('UTC')->toDateTimeString(),
     ];
+});
+
+Route::prefix('procedures')->name('procedures.')->middleware('auth')->group(function () {
+
+    Route::get('/', [ProcedureController::class, 'index'])->name('index');
+    Route::get('/{procedure}', [ProcedureController::class, 'show'])->name('show');
+
+    Route::post('/store', [ProcedureController::class, 'store'])->name('store');
+    Route::post('/{procedure}/issue', [ProcedureController::class, 'issue'])->name('issue');
+    Route::post('/{procedure}/paid', [ProcedureController::class, 'markPaid'])->name('paid');
 });
 
 // routes/web.php

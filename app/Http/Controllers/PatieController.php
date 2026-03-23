@@ -117,45 +117,45 @@ public function historyIndex(Request $request)
 
 public function historySearch(Request $request)
 {
-    $term = trim($request->get('term', ''));
+    $term = trim($request->get('term') ?? '');
 
     $patients = Patient::query()
-        ->when($term !== '', function ($q) use ($term) {
-            $q->where(function ($qq) use ($term) {
-                $qq->where('name', 'like', "%{$term}%")
-                   ->orWhere('patient_id', 'like', "%{$term}%")
-                   ->orWhere('phone', 'like', "%{$term}%");
-            });
+        ->where(function ($q) use ($term) {
+            $q->where('name', 'like', "%{$term}%")
+              ->orWhere('patient_id', 'like', "%{$term}%")
+              ->orWhere('phone', 'like', "%{$term}%");
         })
-        ->orderBy('name')
         ->limit(20)
-        ->get(['id', 'name', 'patient_id', 'phone']);
+        ->get();
 
     return response()->json([
-        'results' => $patients->map(fn($p) => [
-            'id' => $p->id,
-            'text' => "{$p->name} • {$p->patient_id}" . ($p->phone ? " • {$p->phone}" : ''),
-        ]),
+        'results' => $patients->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'text' => "{$p->name} • {$p->patient_id}" . ($p->phone ? " • {$p->phone}" : '')
+            ];
+        })
     ]);
 }
 
 public function historyData(Patient $patient)
 {
     $patient->load([
-        'visits' => function ($q) {
-            $q->latest('visit_date')
-              ->latest('visit_time')
-              ->with([
-                  'doctor:id,name',
-                  'vitals',
-                  'labOrders.test',     // lab test master name/price etc
-                  'labOrders.result',   // LabResult (hasOne)
-                  'medicineOrders.medicine',
-                  'payments.receivedBy:id,name',
-                  'receipt',
-              ]);
-        },
-    ]);
+    'visits' => function ($q) {
+        $q->latest('visit_date')
+          ->latest('visit_time')
+          ->with([
+              'doctor:id,name',
+              'vitals',
+              'labOrders.test',
+              'labOrders.result',
+              'medicineOrders.medicine',
+              'procedures.procedure',
+              'payments.receivedBy:id,name',
+              'receipt',
+          ]);
+    },
+]);
 
     return response()->json([
         'success' => true,

@@ -202,6 +202,14 @@
                         <span class="small fw-bold">Add Lab Test</span>
                     </a>
                 </div>
+                @can('manage procedures')
+                <div class="col-md-3 col-6">
+                    <a href="{{ route('admin.procedures.index') }}" class="btn btn-outline-success w-100 py-3 shadow-sm">
+                        <i class="bi bi-clipboard-check fs-4"></i><br>
+                        <span class="small fw-bold">Procedure Master</span>
+                    </a>
+                </div>
+                @endcan
                 <div class="col-md-3 col-6">
                     <a href="{{ route('medicines.index') }}" class="btn btn-outline-warning w-100 py-3 shadow-sm">
                         <i class="bi bi-capsule-pill fs-4"></i><br>

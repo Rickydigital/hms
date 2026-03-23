@@ -54,6 +54,7 @@
                     </div>
 
                     <!-- Bill Table -->
+<!-- Bill Table -->
 <div class="table-responsive">
     <table class="table table-bordered table-striped align-middle">
         <thead class="table-primary">
@@ -69,77 +70,133 @@
         </thead>
         <tbody>
 
-            @foreach($medicines as $m)
-                @php
-                    $issuedQty = $m->pharmacyIssues->sum('quantity_issued') ?? 1;
-                    $totalPrice = $issuedQty * $m->medicine->price;
-                    $canRemoveMedicine = !$m->is_paid;
-                @endphp
-                <tr>
-                    <td>
-                        {{ $m->medicine->medicine_name }}
-                        @if($m->is_paid)
-                            <span class="badge bg-danger ms-2 small">Paid</span>
-                        @elseif($m->is_issued)
-                            <span class="badge bg-warning ms-2 small">Issued</span>
+            <!-- ====== MEDICINES ====== -->
+            @if($medicines->count())
+                <tr class="table-secondary text-center">
+                    <td colspan="{{ auth()->user()->hasRole('Admin') ? 5 : 4 }}"><strong>Medicines</strong></td>
+                </tr>
+                @foreach($medicines as $m)
+                    @php
+                        $issuedQty = $m->pharmacyIssues->sum('quantity_issued') ?? 1;
+                        $totalPrice = $issuedQty * $m->medicine->price;
+                        $canRemoveMedicine = !$m->is_paid;
+                    @endphp
+                    <tr>
+                        <td>
+                            {{ $m->medicine->medicine_name }}
+                            @if($m->is_paid)
+                                <span class="badge bg-danger ms-2 small">Paid</span>
+                            @elseif($m->is_issued)
+                                <span class="badge bg-warning ms-2 small">Issued</span>
+                            @endif
+                        </td>
+                        <td class="text-center">{{ $issuedQty }}</td>
+                        <td class="text-end">Tsh{{ number_format($m->medicine->price, 0) }}</td>
+                        <td class="text-end">Tsh{{ number_format($totalPrice, 0) }}</td>
+                        @if(auth()->user()->hasRole('Admin'))
+                            <td class="text-center">
+                                @if($canRemoveMedicine)
+                                    <button type="button" class="btn btn-sm btn-danger rounded-pill"
+                                            onclick="removeBillItem({{ $m->id }}, 'medicine', '{{ addslashes($m->medicine->medicine_name) }}')">
+                                        <i class="bi bi-trash me-1"></i> Remove
+                                    </button>
+                                @endif
+                            </td>
                         @endif
-                    </td>
-                    <td class="text-center">{{ $issuedQty }}</td>
-                    <td class="text-end">Tsh{{ number_format($m->medicine->price, 0) }}</td>
-                    <td class="text-end">Tsh{{ number_format($totalPrice, 0) }}</td>
-                    @if(auth()->user()->hasRole('Admin'))
-                        <td class="text-center">
-                            @if($canRemoveMedicine)
-                                <button type="button" class="btn btn-sm btn-danger rounded-pill"
-                                        onclick="removeBillItem({{ $m->id }}, 'medicine', '{{ addslashes($m->medicine->medicine_name) }}')">
-                                    <i class="bi bi-trash me-1"></i> Remove
-                                </button>
-                            @endif
-                        </td>
-                    @endif
-                </tr>
-            @endforeach
+                    </tr>
+                @endforeach
+            @endif
 
-            @foreach($labTests as $t)
-                @php
-                    $canRemoveLab = !$t->is_paid;
-                @endphp
-                <tr>
-                    <td>{{ $t->test->test_name }} (Lab Test)</td>
-                    <td class="text-center">1</td>
-                    <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
-                    <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
-                    @if(auth()->user()->hasRole('Admin'))
-                        <td class="text-center">
-                            @if($canRemoveLab)
-                                <button type="button" class="btn btn-sm btn-danger rounded-pill"
-                                        onclick="removeBillItem({{ $t->id }}, 'lab', '{{ addslashes($t->test->test_name) }}')">
-                                    <i class="bi bi-trash me-1"></i> Remove
-                                </button>
-                            @else
-                                <span class="badge bg-secondary small">Paid</span>
-                            @endif
-                        </td>
-                    @endif
+            <!-- ====== LAB TESTS ====== -->
+            @if($labTests->count())
+                <tr class="table-secondary text-center">
+                    <td colspan="{{ auth()->user()->hasRole('Admin') ? 5 : 4 }}"><strong>Lab Tests</strong></td>
                 </tr>
-            @endforeach
+                @foreach($labTests as $t)
+                    @php
+                        $canRemoveLab = !$t->is_paid;
+                    @endphp
+                    <tr>
+                        <td>{{ $t->test->test_name }} (Lab Test)</td>
+                        <td class="text-center">1</td>
+                        <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
+                        <td class="text-end">Tsh{{ number_format($t->test->price, 0) }}</td>
+                        @if(auth()->user()->hasRole('Admin'))
+                            <td class="text-center">
+                                @if($canRemoveLab)
+                                    <button type="button" class="btn btn-sm btn-danger rounded-pill"
+                                            onclick="removeBillItem({{ $t->id }}, 'lab', '{{ addslashes($t->test->test_name) }}')">
+                                        <i class="bi bi-trash me-1"></i> Remove
+                                    </button>
+                                @else
+                                    <span class="badge bg-secondary small">Paid</span>
+                                @endif
+                            </td>
+                        @endif
+                    </tr>
+                @endforeach
+            @endif
 
-            @foreach($injections as $i)
-                <tr>
-                    <td>{{ $i->medicine->medicine_name }} (Injection)</td>
-                    <td class="text-center">1</td>
-                    <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
-                    <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
-                    <!-- Add injection remove logic later if needed -->
-                    @if(auth()->user()->hasRole('Admin'))
-                        <td class="text-center">
-                            <span class="badge bg-secondary small">Locked</span>
-                        </td>
-                    @endif
+            <!-- ====== INJECTIONS ====== -->
+            @if($injections->count())
+                <tr class="table-secondary text-center">
+                    <td colspan="{{ auth()->user()->hasRole('Admin') ? 5 : 4 }}"><strong>Injections</strong></td>
                 </tr>
-            @endforeach
+                @foreach($injections as $i)
+                    <tr>
+                        <td>{{ $i->medicine->medicine_name }} (Injection)</td>
+                        <td class="text-center">1</td>
+                        <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
+                        <td class="text-end">Tsh{{ number_format($i->medicine->price, 0) }}</td>
+                        @if(auth()->user()->hasRole('Admin'))
+                            <td class="text-center">
+                                <span class="badge bg-secondary small">Locked</span>
+                            </td>
+                        @endif
+                    </tr>
+                @endforeach
+            @endif
 
+            <!-- ====== PROCEDURES ====== -->
+            @if($procedures->count())
+                <tr class="table-secondary text-center">
+                    <td colspan="{{ auth()->user()->hasRole('Admin') ? 5 : 4 }}"><strong>Procedures</strong></td>
+                </tr>
+                @foreach($procedures as $p)
+                    @php
+                        $canRemoveProcedure = !$p->is_paid && !$p->is_issued;
+                        $unitPrice = $p->procedure->price;
+                    @endphp
+                    <tr>
+                        <td>{{ $p->procedure->procedure_name }} (Procedure)</td>
+                        <td class="text-center">1</td>
+                        <td class="text-end">Tsh{{ number_format($unitPrice, 0) }}</td>
+                        <td class="text-end">Tsh{{ number_format($unitPrice, 0) }}</td>
+                        @if(auth()->user()->hasRole('Admin'))
+                            <td class="text-center">
+                                @if($canRemoveProcedure)
+                                    <button type="button" class="btn btn-sm btn-danger rounded-pill"
+                                            onclick="removeBillItem({{ $p->id }}, 'procedure', '{{ addslashes($p->procedure->procedure_name) }}')">
+                                        <i class="bi bi-trash me-1"></i> Remove
+                                    </button>
+                                @else
+                                    @if($p->is_paid)
+                                        <span class="badge bg-danger small">Paid</span>
+                                    @elseif($p->is_issued)
+                                        <span class="badge bg-warning small">Completed</span>
+                                    @endif
+                                @endif
+                            </td>
+                        @endif
+                    </tr>
+                @endforeach
+            @endif
+
+            <!-- ====== BED / WARD CHARGES ====== -->
             @if($bedCharges > 0)
+                <tr class="table-secondary text-center">
+                    <td colspan="{{ auth()->user()->hasRole('Admin') ? 5 : 4 }}"><strong>Bed/Ward Charges</strong></td>
+                </tr>
                 <tr>
                     <td>Bed/Ward Charges ({{ $bedDays }} day{{ $bedDays > 1 ? 's' : '' }})</td>
                     <td class="text-center">1</td>
@@ -154,6 +211,8 @@
             @endif
 
         </tbody>
+
+        <!-- GRAND TOTAL -->
         <tfoot class="table-dark">
             <tr>
                 <th colspan="{{ auth()->user()->hasRole('Admin') ? 4 : 3 }}" class="text-end fs-5">GRAND TOTAL</th>
