@@ -78,8 +78,10 @@
                 <tr>
                     <td>
                         {{ $m->medicine->medicine_name }}
-                        @if(!$canRemoveMedicine && auth()->user()->hasRole('Admin'))
-                            <span class="badge bg-secondary ms-2 small">Issued / Paid</span>
+                        @if($m->is_paid)
+                            <span class="badge bg-danger ms-2 small">Paid</span>
+                        @elseif($m->is_issued)
+                            <span class="badge bg-warning ms-2 small">Issued</span>
                         @endif
                     </td>
                     <td class="text-center">{{ $issuedQty }}</td>
