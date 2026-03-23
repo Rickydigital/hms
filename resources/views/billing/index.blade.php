@@ -73,7 +73,7 @@
                 @php
                     $issuedQty = $m->pharmacyIssues->sum('quantity_issued') ?? 1;
                     $totalPrice = $issuedQty * $m->medicine->price;
-                    $canRemoveMedicine = !$m->is_paid && !$m->is_issued;
+                    $canRemoveMedicine = !$m->is_paid;
                 @endphp
                 <tr>
                     <td>
