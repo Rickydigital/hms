@@ -123,10 +123,11 @@ public function revenue(Request $request) // <-- add Request $request
     );
 
     // Chart
-    $chartLabels = $dates->map(fn($d) => Carbon::parse($d)->format('d M'))->toArray();
-$chartOpd = $dates->map(fn($d) => $opdRevenues->get($d, 0))->toArray();
-$chartPharmacy = $dates->map(fn($d) => $pharmacyRevenues->get($d, 0))->toArray();
-$chartTotal = $dates->map(fn($d) => $opdRevenues->get($d, 0) + $pharmacyRevenues->get($d, 0))->toArray();
+    // CHART
+$chartLabels = $dates->map(fn($d) => Carbon::parse($d)->format('d M'))->toArray();
+$chartOpd = $dates->map(fn($d) => (float) $opdRevenues->get($d, 0))->toArray();
+$chartPharmacy = $dates->map(fn($d) => (float) $pharmacyRevenues->get($d, 0))->toArray();
+$chartTotal = $dates->map(fn($d) => (float) $opdRevenues->get($d, 0) + (float) $pharmacyRevenues->get($d, 0))->toArray();
 
 $revenueChart = [
     'labels' => $chartLabels,
