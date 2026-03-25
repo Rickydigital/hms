@@ -109,7 +109,7 @@ public function historyIndex(Request $request)
 {
     $query = Patient::query();
 
-    // ✅ FILTER (important for summary sync)
+    // ✅ SEARCH FILTER
     if ($request->filled('search')) {
         $search = trim($request->search);
         $query->where(function ($q) use ($search) {
@@ -119,27 +119,41 @@ public function historyIndex(Request $request)
         });
     }
 
-    // ✅ CLONE for summary (CRITICAL)
+    // ✅ DATE FILTER (DEFAULT = THIS MONTH)
+    $startDate = $request->start_date;
+    $endDate   = $request->end_date;
+
+    if (!$startDate || !$endDate) {
+        $startDate = now()->startOfMonth()->toDateString();
+        $endDate   = now()->endOfMonth()->toDateString();
+    }
+
+    // ✅ CLONE for summary
     $summaryQuery = clone $query;
 
     // =========================
     // 📊 SUMMARY CALCULATIONS
     // =========================
 
-    // Total patients
+    // Total patients (filtered by search only)
     $totalPatients = $summaryQuery->count();
 
-    // Returning patients (have visits)
-    $returningPatients = (clone $summaryQuery)
-        ->whereHas('visits')
+    // Total visits (FILTERED BY DATE)
+    $totalVisits = DB::table('visits')
+        ->whereBetween('visit_date', [$startDate, $endDate])
+        ->whereIn('patient_id', $summaryQuery->pluck('id'))
         ->count();
 
-    // New patients (no visits)
-    $newPatients = $totalPatients - $returningPatients;
+    // Returning patients (visited in selected period)
+    $returningPatients = (clone $summaryQuery)
+        ->whereHas('visits', function ($q) use ($startDate, $endDate) {
+            $q->whereBetween('visit_date', [$startDate, $endDate]);
+        })
+        ->count();
 
-    // Total visits (only for filtered patients)
-    $totalVisits = DB::table('visits')
-        ->whereIn('patient_id', $summaryQuery->pluck('id'))
+    // New patients (never visited EVER)
+    $newPatients = (clone $summaryQuery)
+        ->whereDoesntHave('visits')
         ->count();
 
     // =========================
@@ -154,7 +168,9 @@ public function historyIndex(Request $request)
         'totalPatients',
         'totalVisits',
         'newPatients',
-        'returningPatients'
+        'returningPatients',
+        'startDate',
+        'endDate'
     ));
 }
 

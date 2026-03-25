@@ -11,6 +11,51 @@
         </div>
     </div>
 
+
+    {{-- ✅ DATE FILTER --}}
+<div class="card shadow-sm rounded-4 mb-3">
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end">
+
+            <div class="col-md-3">
+                <label class="fw-semibold">Start Date</label>
+                <input type="date" name="start_date" class="form-control"
+                       value="{{ $startDate }}">
+            </div>
+
+            <div class="col-md-3">
+                <label class="fw-semibold">End Date</label>
+                <input type="date" name="end_date" class="form-control"
+                       value="{{ $endDate }}">
+            </div>
+
+            <div class="col-md-3">
+                <button class="btn btn-primary w-100">
+                    Apply Filter
+                </button>
+            </div>
+
+            <div class="col-md-3">
+                <a href="{{ route('patients.history') }}" class="btn btn-light w-100">
+                    Reset
+                </a>
+            </div>
+
+            {{-- 🔥 QUICK BUTTONS --}}
+            <div class="col-md-12 mt-2">
+                <a href="?start_date={{ now()->toDateString() }}&end_date={{ now()->toDateString() }}"
+                   class="btn btn-sm btn-outline-primary">Today</a>
+
+                <a href="?start_date={{ now()->startOfMonth()->toDateString() }}&end_date={{ now()->endOfMonth()->toDateString() }}"
+                   class="btn btn-sm btn-outline-success">This Month</a>
+
+                <a href="?start_date={{ now()->startOfYear()->toDateString() }}&end_date={{ now()->endOfYear()->toDateString() }}"
+                   class="btn btn-sm btn-outline-dark">This Year</a>
+            </div>
+
+        </form>
+    </div>
+</div>
     {{-- ✅ SUMMARY CARDS --}}
 <div class="row mb-3">
 
@@ -43,6 +88,8 @@
     </div>
 
 </div>
+
+
 
     {{-- Search --}}
     <div class="card shadow-sm rounded-4 mb-3">
