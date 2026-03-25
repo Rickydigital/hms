@@ -12,6 +12,7 @@ use App\Models\PharmacyIssue;
 use App\Models\VisitLabOrder;
 use App\Models\Payment;
 use App\Models\PharmacySale;
+use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
@@ -62,10 +63,12 @@ class DashboardController extends Controller
         return view('admin.dashboard', $data);
     }
 
-   public function revenue()
+
+
+public function revenue(Request $request) // <-- add Request $request
 {
     $from = Carbon::parse($request->from ?? Carbon::today()->subMonth())->startOfDay();
-    $to = Carbon::parse($request->to ?? Carbon::today())->endOfDay();
+    $to   = Carbon::parse($request->to ?? Carbon::today())->endOfDay();
 
     // OPD Revenue
     $opdRevenues = Payment::select(
@@ -110,44 +113,44 @@ class DashboardController extends Controller
 
     // Pagination
     $perPage = 30;
-    $page = request('page', 1);
+    $page = $request->page ?? 1;
     $paginatedRevenues = new \Illuminate\Pagination\LengthAwarePaginator(
         $revenues->forPage($page, $perPage),
         $revenues->count(),
         $perPage,
         $page,
-        ['path' => request()->url(), 'query' => request()->query()]
+        ['path' => request()->url(), 'query' => $request->query()]
     );
 
     // Chart
-    $chartLabels = $dates->map(fn($d) => Carbon::parse($d)->format('d M'));
-    $chartOpd = $dates->map(fn($d) => $opdRevenues->get($d, 0));
-    $chartPharmacy = $dates->map(fn($d) => $pharmacyRevenues->get($d, 0));
-    $chartTotal = $dates->map(fn($d) => $opdRevenues->get($d, 0) + $pharmacyRevenues->get($d, 0));
+    $chartLabels = $dates->map(fn($d) => Carbon::parse($d)->format('d M'))->toArray();
+$chartOpd = $dates->map(fn($d) => $opdRevenues->get($d, 0))->toArray();
+$chartPharmacy = $dates->map(fn($d) => $pharmacyRevenues->get($d, 0))->toArray();
+$chartTotal = $dates->map(fn($d) => $opdRevenues->get($d, 0) + $pharmacyRevenues->get($d, 0))->toArray();
 
-    $revenueChart = [
-        'labels' => $chartLabels,
-        'datasets' => [
-            [
-                'label' => 'OPD Revenue',
-                'data' => $chartOpd,
-                'borderColor' => 'rgba(75, 192, 192, 1)',
-                'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
-            ],
-            [
-                'label' => 'Pharmacy Revenue',
-                'data' => $chartPharmacy,
-                'borderColor' => 'rgba(153, 102, 255, 1)',
-                'backgroundColor' => 'rgba(153, 102, 255, 0.2)',
-            ],
-            [
-                'label' => 'Total Revenue',
-                'data' => $chartTotal,
-                'borderColor' => 'rgba(255, 159, 64, 1)',
-                'backgroundColor' => 'rgba(255, 159, 64, 0.2)',
-            ],
+$revenueChart = [
+    'labels' => $chartLabels,
+    'datasets' => [
+        [
+            'label' => 'OPD Revenue',
+            'data' => $chartOpd,
+            'borderColor' => 'rgba(75, 192, 192, 1)',
+            'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
         ],
-    ];
+        [
+            'label' => 'Pharmacy Revenue',
+            'data' => $chartPharmacy,
+            'borderColor' => 'rgba(153, 102, 255, 1)',
+            'backgroundColor' => 'rgba(153, 102, 255, 0.2)',
+        ],
+        [
+            'label' => 'Total Revenue',
+            'data' => $chartTotal,
+            'borderColor' => 'rgba(255, 159, 64, 1)',
+            'backgroundColor' => 'rgba(255, 159, 64, 0.2)',
+        ],
+    ],
+];
 
     return view('admin.revenue-history', [
         'revenues' => $paginatedRevenues,
