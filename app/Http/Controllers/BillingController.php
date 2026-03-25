@@ -24,7 +24,7 @@ class BillingController extends Controller
         $pendingVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
                 $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
-                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false)->orWhere('is_paid', false))
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', true)->orWhere('is_paid', false))
                   ->orWhereHas('injectionOrders')
                   ->orWhereHas('bedAdmission')
                   ->orWhereHas('procedures', fn($sq) => $sq->where('is_paid', false)); // PROCEDURE
@@ -36,7 +36,7 @@ class BillingController extends Controller
         $inProgressVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
                 $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
-                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', true))
                   ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
                   ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false))
                   ->orWhereHas('procedures', fn($sq) => $sq->where('is_issued', false)); // PROCEDURE
@@ -176,7 +176,7 @@ class BillingController extends Controller
     {
         // Medicines: Only issued AND unpaid
         $medicines = $visit->medicineOrders()
-            ->where('is_issued', false)
+            ->where('is_issued', true)
             ->where('is_paid', false)
             ->with(['medicine', 'pharmacyIssues'])
             ->get();
@@ -227,7 +227,7 @@ class BillingController extends Controller
         $pendingVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
                 $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
-                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false)->orWhere('is_paid', false))
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', true)->orWhere('is_paid', false))
                   ->orWhereHas('injectionOrders')
                   ->orWhereHas('bedAdmission')
                   ->orWhereHas('procedures', fn($sq) => $sq->where('is_paid', false)); // PROCEDURE
@@ -240,7 +240,7 @@ class BillingController extends Controller
         $inProgressVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
                 $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
-                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', false))
+                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', true))
                   ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
                   ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false))
                   ->orWhereHas('procedures', fn($sq) => $sq->where('is_issued', false)); // PROCEDURE
