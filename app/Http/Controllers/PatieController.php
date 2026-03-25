@@ -152,9 +152,11 @@ public function historyIndex(Request $request)
         ->count();
 
     // New patients (never visited EVER)
-    $newPatients = (clone $summaryQuery)
-        ->whereDoesntHave('visits')
-        ->count();
+   $newPatients = (clone $summaryQuery)
+    ->whereDoesntHave('visits', function ($q) use ($startDate) {
+        $q->where('visit_date', '<', $startDate);
+    })
+    ->count();
 
     // =========================
     // 📄 PAGINATION

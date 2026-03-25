@@ -1,4 +1,3 @@
-{{-- resources/views/admin/revenue-history.blade.php --}}
 @extends('components.main-layout')
 @section('title', 'Revenue History • Mana Dispensary')
 
@@ -17,7 +16,7 @@
         </a>
     </div>
 
-    <!-- Search & Filter -->
+    <!-- Filter -->
     <div class="card shadow mb-4 border-teal">
         <div class="card-body">
             <form method="GET" class="row g-3">
@@ -53,7 +52,29 @@
         </div>
     </div>
 
-    <!-- History Table -->
+    <!-- Totals Card -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card shadow border-0 text-center p-3">
+                <h6>Total OPD Revenue</h6>
+                <h4 class="text-teal-700 fw-bold">Tsh {{ number_format($totalOpd, 0) }}</h4>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow border-0 text-center p-3">
+                <h6>Total Pharmacy Revenue</h6>
+                <h4 class="text-teal-700 fw-bold">Tsh {{ number_format($totalPharmacy, 0) }}</h4>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow border-0 text-center p-3">
+                <h6>Grand Total Revenue</h6>
+                <h4 class="text-teal-700 fw-bold">Tsh {{ number_format($grandTotal, 0) }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Table -->
     <div class="card shadow border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -68,7 +89,7 @@
                     </thead>
                     <tbody>
                         @forelse($revenues as $revenue)
-                        <tr class="hover:bg-teal-50">
+                        <tr>
                             <td class="fw-bold">{{ \Carbon\Carbon::parse($revenue['date'])->format('d M Y') }}</td>
                             <td class="text-end fw-bold text-teal-700">
                                 Tsh {{ number_format($revenue['opd_revenue'], 0) }}
@@ -89,6 +110,16 @@
                         </tr>
                         @endforelse
                     </tbody>
+                    @if($revenues->count())
+                    <tfoot class="bg-light fw-bold">
+                        <tr>
+                            <td>Total</td>
+                            <td class="text-end">Tsh {{ number_format($totalOpd, 0) }}</td>
+                            <td class="text-end">Tsh {{ number_format($totalPharmacy, 0) }}</td>
+                            <td class="text-end">Tsh {{ number_format($grandTotal, 0) }}</td>
+                        </tr>
+                    </tfoot>
+                    @endif
                 </table>
             </div>
             <div class="card-footer bg-light">
@@ -96,27 +127,47 @@
             </div>
         </div>
     </div>
+
 </div>
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    const revenueChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {!! json_encode($revenue_chart['labels']) !!},
-            datasets: {!! json_encode($revenue_chart['datasets']) !!}
+const ctx = document.getElementById('revenueChart').getContext('2d');
+const revenueChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: {!! json_encode($revenue_chart['labels']) !!},
+        datasets: {!! json_encode($revenue_chart['datasets']) !!}
+    },
+    options: {
+        responsive: true,
+        interaction: {
+            mode: 'index',
+            intersect: false
         },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: true
+        stacked: false,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.dataset.label + ': Tsh ' + Number(context.raw).toLocaleString();
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'Tsh ' + Number(value).toLocaleString();
+                    }
                 }
             }
         }
-    });
+    }
+});
 </script>
 @endpush
 @endsection
