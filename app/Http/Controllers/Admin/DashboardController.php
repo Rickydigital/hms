@@ -62,7 +62,7 @@ class DashboardController extends Controller
         return view('admin.dashboard', $data);
     }
 
-   public function revenue(Request $request)
+   public function revenue()
 {
     $from = Carbon::parse($request->from ?? Carbon::today()->subMonth())->startOfDay();
     $to = Carbon::parse($request->to ?? Carbon::today())->endOfDay();
