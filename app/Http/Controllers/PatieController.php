@@ -107,12 +107,55 @@ public function store(Request $request)
  */
 public function historyIndex(Request $request)
 {
-    $patients = Patient::query()
-        ->orderBy('name')
+    $query = Patient::query();
+
+    // ✅ FILTER (important for summary sync)
+    if ($request->filled('search')) {
+        $search = trim($request->search);
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('patient_id', 'like', "%{$search}%")
+              ->orWhere('phone', 'like', "%{$search}%");
+        });
+    }
+
+    // ✅ CLONE for summary (CRITICAL)
+    $summaryQuery = clone $query;
+
+    // =========================
+    // 📊 SUMMARY CALCULATIONS
+    // =========================
+
+    // Total patients
+    $totalPatients = $summaryQuery->count();
+
+    // Returning patients (have visits)
+    $returningPatients = (clone $summaryQuery)
+        ->whereHas('visits')
+        ->count();
+
+    // New patients (no visits)
+    $newPatients = $totalPatients - $returningPatients;
+
+    // Total visits (only for filtered patients)
+    $totalVisits = DB::table('visits')
+        ->whereIn('patient_id', $summaryQuery->pluck('id'))
+        ->count();
+
+    // =========================
+    // 📄 PAGINATION
+    // =========================
+    $patients = $query->orderBy('name')
         ->paginate(20)
         ->withQueryString();
 
-    return view('patients.history', compact('patients'));
+    return view('patients.history', compact(
+        'patients',
+        'totalPatients',
+        'totalVisits',
+        'newPatients',
+        'returningPatients'
+    ));
 }
 
 public function historySearch(Request $request)

@@ -11,6 +11,39 @@
         </div>
     </div>
 
+    {{-- ✅ SUMMARY CARDS --}}
+<div class="row mb-3">
+
+    <div class="col-md-3">
+        <div class="card shadow-sm rounded-4 text-center p-3">
+            <small class="text-muted">Total Patients</small>
+            <h4 class="fw-bold text-primary mb-0">{{ $totalPatients ?? 0 }}</h4>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm rounded-4 text-center p-3">
+            <small class="text-muted">Total Visits</small>
+            <h4 class="fw-bold text-success mb-0">{{ $totalVisits ?? 0 }}</h4>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm rounded-4 text-center p-3">
+            <small class="text-muted">New Patients</small>
+            <h4 class="fw-bold text-warning mb-0">{{ $newPatients ?? 0 }}</h4>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm rounded-4 text-center p-3">
+            <small class="text-muted">Returning Patients</small>
+            <h4 class="fw-bold text-info mb-0">{{ $returningPatients ?? 0 }}</h4>
+        </div>
+    </div>
+
+</div>
+
     {{-- Search --}}
     <div class="card shadow-sm rounded-4 mb-3">
         <div class="card-body">
