@@ -130,11 +130,7 @@
 
 </div>
 
-<script>
-console.log("Revenue Chart Data:", {!! json_encode($revenue_chart) !!});
-</script>
 
-@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const ctx = document.getElementById('revenueChart').getContext('2d');
@@ -173,5 +169,4 @@ const revenueChart = new Chart(ctx, {
     }
 });
 </script>
-@endpush
 @endsection
