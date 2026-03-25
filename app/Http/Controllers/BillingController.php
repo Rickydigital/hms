@@ -8,7 +8,7 @@ use App\Models\PaymentDetail;
 use App\Models\Visit;
 use App\Models\VisitLabOrder;
 use App\Models\VisitMedicineOrder;
-use App\Models\VisitProcedure; // ← PROCEDURE
+use App\Models\VisitProcedure;
 use App\Models\Receipt;
 use App\Models\Setting;
 use Illuminate\Http\Request;
@@ -24,7 +24,10 @@ class BillingController extends Controller
         $pendingVisits = Visit::with(['patient', 'doctor'])
             ->where(function ($q) {
                 $q->whereHas('labOrders', fn($sq) => $sq->where('is_paid', false))
-                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', true)->orWhere('is_paid', false))
+                  ->orWhereHas('medicineOrders', function ($sq) {
+                        $sq->where('is_issued', true)
+                            ->where('is_paid', false);
+                    })
                   ->orWhereHas('injectionOrders')
                   ->orWhereHas('bedAdmission')
                   ->orWhereHas('procedures', fn($sq) => $sq->where('is_paid', false)); // PROCEDURE
@@ -34,13 +37,7 @@ class BillingController extends Controller
 
         // IN PROGRESS: Visits with services but not fully completed/paid
         $inProgressVisits = Visit::with(['patient', 'doctor'])
-            ->where(function ($q) {
-                $q->whereHas('labOrders', fn($sq) => $sq->where('is_completed', false)->where('is_paid', true))
-                  ->orWhereHas('medicineOrders', fn($sq) => $sq->where('is_issued', true))
-                  ->orWhereHas('injectionOrders', fn($sq) => $sq->where('is_given', false))
-                  ->orWhereHas('bedAdmission', fn($sq) => $sq->where('is_discharged', false))
-                  ->orWhereHas('procedures', fn($sq) => $sq->where('is_issued', false)); // PROCEDURE
-            })
+            ->where('status', 'in_progress')
             ->latest('visit_date')
             ->get();
 
@@ -76,22 +73,43 @@ class BillingController extends Controller
                 if ($request->item_type === 'medicine') {
                     $order = $visit->medicineOrders()->findOrFail($request->item_id);
 
-                    if ($order->is_issued) {
-                        throw new \Exception('Cannot remove: medicine already issued.');
+                    // ❌ Prevent removing if already PAID
+                    if ($order->is_paid) {
+                        throw new \Exception('Cannot remove: medicine already paid.');
                     }
 
-                    $issues = $order->pharmacyIssues;
-                    foreach ($issues as $issue) {
-                        MedicineBatch::where('medicine_id', $issue->medicine_id)
-                            ->where('batch_no', $issue->batch_no)
-                            ->increment('current_stock', $issue->quantity_issued);
-                        $issue->delete();
+                    // 🔄 If issued → restore stock
+                    if ($order->is_issued) {
+                        $issues = $order->pharmacyIssues;
+
+                        foreach ($issues as $issue) {
+                            $batch = MedicineBatch::where('medicine_id', $issue->medicine_id)
+                                ->where('batch_no', $issue->batch_no)
+                                ->first();
+
+                            if ($batch) {
+                                $batch->logStockChange(
+                                    $issue->quantity_issued,
+                                    'return',
+                                    $order,
+                                    'Medicine removed from billing - stock restored'
+                                );
+                            }
+
+                            $issue->delete();
+                        }
                     }
 
                     $medicineName = $order->medicine->medicine_name;
+
+                    // ❌ Reset flags (optional but clean)
+                    $order->is_issued = false;
+                    $order->save();
+
+                    // 🗑️ Delete order
                     $order->delete();
 
-                    $message = "Medicine '{$medicineName}' removed. Stock restored.";
+                    $message = "Medicine '{$medicineName}' removed. Stock restored if issued.";
                 } elseif ($request->item_type === 'lab') {
                     $order = $visit->labOrders()->findOrFail($request->item_id);
 
@@ -177,7 +195,7 @@ class BillingController extends Controller
         // Medicines: Only issued AND unpaid
         $medicines = $visit->medicineOrders()
             ->where('is_issued', true)
-            ->where('is_paid', false)
+            ->where('is_paid', false)  
             ->with(['medicine', 'pharmacyIssues'])
             ->get();
 
@@ -209,7 +227,10 @@ class BillingController extends Controller
 
         // Grand total
         $grandTotal = 0;
-        $grandTotal += $medicines->sum(fn($order) => ($order->pharmacyIssues->sum('quantity_issued') ?? 1) * $order->medicine->price);
+        $grandTotal += $medicines->sum(function ($order) {
+            $issuedQty = $order->pharmacyIssues->sum('quantity_issued') ?? 1;
+            return $issuedQty * $order->medicine->price;
+        });
         $grandTotal += $labTests->sum(fn($t) => $t->test->price);
         $grandTotal += $injections->sum(fn($i) => $i->medicine->price);
         $grandTotal += $procedures->sum(fn($p) => $p->procedure->price); // PROCEDURE
