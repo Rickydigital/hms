@@ -36,7 +36,7 @@
             </div>
 
             <div class="col-md-3">
-                <a href="{{ route('patients.history') }}" class="btn btn-light w-100">
+                <a href="{{ route('patients.history.index') }}" class="btn btn-light w-100">
                     Reset
                 </a>
             </div>
