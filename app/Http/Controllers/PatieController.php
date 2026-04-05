@@ -202,21 +202,26 @@ public function historySearch(Request $request)
 public function historyData(Patient $patient)
 {
     $patient->load([
-    'visits' => function ($q) {
-        $q->latest('visit_date')
-          ->latest('visit_time')
-          ->with([
-              'doctor:id,name',
-              'vitals',
-              'labOrders.test',
-              'labOrders.result',
-              'medicineOrders.medicine',
-              'procedures.procedure',
-              'payments.receivedBy:id,name',
-              'receipt',
-          ]);
-    },
-]);
+        'visits' => function ($q) {
+            $q->latest('visit_date')
+              ->latest('visit_time')
+              ->with([
+                  'doctor:id,name',
+                  'vitals',
+                  'labOrders.test',
+                  'labOrders.result',
+                  'labOrders.paidBy:id,name',
+                  'medicineOrders.medicine',
+                  'medicineOrders.issuedBy:id,name',
+                  'medicineOrders.paidBy:id,name',
+                  'medicineOrders.handedOverBy:id,name',
+                  'medicineOrders.pharmacyIssues.issuedBy:id,name',
+                  'procedures.procedure',
+                  'payments.receivedBy:id,name',
+                  'receipt',
+              ]);
+        },
+    ]);
 
     return response()->json([
         'success' => true,

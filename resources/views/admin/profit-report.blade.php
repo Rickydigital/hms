@@ -148,7 +148,7 @@
 </div>
 @endsection
 
-@push('styles')
+
 <style>
     .bg-teal {
         background: linear-gradient(135deg, #0d9488, #0f766e) !important;
@@ -158,4 +158,3 @@
     }
     .table-responsive { -webkit-overflow-scrolling: touch; }
 </style>
-@endpush
