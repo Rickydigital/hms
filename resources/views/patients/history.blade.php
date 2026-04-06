@@ -265,7 +265,7 @@ function safeArray(value) {
 }
 
 function escapeHtml(value) {
-    if (value === null || value === undefined) return '—';
+    if (value === null || value === undefined || value === '') return '—';
     return String(value)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -283,10 +283,10 @@ function formatDate(value) {
     if (!value) return '—';
     try {
         const d = new Date(value);
-        if (isNaN(d.getTime())) return escapeHtml(value);
+        if (isNaN(d.getTime())) return value;
         return d.toISOString().split('T')[0];
     } catch (e) {
-        return escapeHtml(value);
+        return value;
     }
 }
 
@@ -294,35 +294,33 @@ function formatDateTime(value) {
     if (!value) return '—';
     try {
         const d = new Date(value);
-        if (isNaN(d.getTime())) return escapeHtml(value);
+        if (isNaN(d.getTime())) return value;
         return d.toLocaleString();
     } catch (e) {
-        return escapeHtml(value);
+        return value;
     }
 }
 
 function getDoctorName(v) {
-    return v && v.doctor && v.doctor.name ? v.doctor.name : '—';
+    return v?.doctor?.name ?? '—';
 }
 
 function getNotes(v) {
-    if (v && v.vitals && v.vitals.diagnosis) return v.vitals.diagnosis;
-    if (v && v.notes) return v.notes;
-    return '—';
+    return v?.vitals?.diagnosis ?? v?.notes ?? '—';
 }
 
 function getLabTestName(lab) {
-    if (lab && lab.test) {
-        return lab.test.name || lab.test.test_name || lab.test.lab_test_name || 'Lab Test';
-    }
-    return 'Lab Test';
+    return lab?.test?.name
+        ?? lab?.test?.test_name
+        ?? lab?.test?.lab_test_name
+        ?? 'Lab Test';
 }
 
 function getMedicineName(item) {
-    if (item && item.medicine) {
-        return item.medicine.name || item.medicine.medicine_name || item.medicine.drug_name || 'Medicine';
-    }
-    return 'Medicine';
+    return item?.medicine?.name
+        ?? item?.medicine?.medicine_name
+        ?? item?.medicine?.drug_name
+        ?? 'Medicine';
 }
 
 function renderLabs(labOrders) {
@@ -333,38 +331,30 @@ function renderLabs(labOrders) {
     }
 
     return labs.map(lab => {
-        const result = lab && lab.result ? lab.result : null;
-
-        const paidBadge = lab && lab.is_paid
-            ? '<span class="badge bg-success">Paid</span>'
-            : '<span class="badge bg-danger">Unpaid</span>';
-
-        const completedBadge = lab && lab.is_completed
-            ? '<span class="badge bg-primary">Completed</span>'
-            : '<span class="badge bg-warning text-dark">Pending</span>';
-
-        const abnormalBadge = result && result.is_abnormal
-            ? '<span class="badge bg-danger">Abnormal</span>'
-            : (result ? '<span class="badge bg-secondary">Reported</span>' : '');
+        const result = lab?.result ?? null;
 
         return `
             <div class="border rounded p-2 mb-2 bg-light">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                     <strong>${escapeHtml(getLabTestName(lab))}</strong>
-                    ${paidBadge}
-                    ${completedBadge}
-                    ${abnormalBadge}
+                    <span class="badge ${lab?.is_paid ? 'bg-success' : 'bg-danger'}">
+                        ${lab?.is_paid ? 'Paid' : 'Unpaid'}
+                    </span>
+                    <span class="badge ${lab?.is_completed ? 'bg-primary' : 'bg-warning text-dark'}">
+                        ${lab?.is_completed ? 'Completed' : 'Pending'}
+                    </span>
+                    ${result?.is_abnormal ? '<span class="badge bg-danger">Abnormal</span>' : ''}
                 </div>
 
                 <div class="small">
-                    <div><span class="text-muted">Value:</span> ${escapeHtml(result ? result.result_value : '—')}</div>
-                    <div><span class="text-muted">Text:</span> ${escapeHtml(result ? result.result_text : '—')}</div>
-                    <div><span class="text-muted">Normal Range:</span> ${escapeHtml(result ? result.normal_range : '—')}</div>
-                    <div><span class="text-muted">Remarks:</span> ${escapeHtml(result ? result.remarks : '—')}</div>
+                    <div><span class="text-muted">Value:</span> ${escapeHtml(result?.result_value)}</div>
+                    <div><span class="text-muted">Text:</span> ${escapeHtml(result?.result_text)}</div>
+                    <div><span class="text-muted">Normal Range:</span> ${escapeHtml(result?.normal_range)}</div>
+                    <div><span class="text-muted">Remarks:</span> ${escapeHtml(result?.remarks)}</div>
                 </div>
 
-                <div class="small text-muted mt-1">Paid at: ${formatDateTime(lab ? lab.paid_at : null)}</div>
-                <div class="small text-muted">Completed at: ${formatDateTime(lab ? lab.completed_at : null)}</div>
+                <div class="small text-muted mt-1">Paid at: ${escapeHtml(formatDateTime(lab?.paid_at))}</div>
+                <div class="small text-muted">Completed at: ${escapeHtml(formatDateTime(lab?.completed_at))}</div>
             </div>
         `;
     }).join('');
@@ -378,36 +368,28 @@ function renderMedicines(medicineOrders) {
     }
 
     return meds.map(item => {
-        const issueBadge = item && item.is_issued
-            ? '<span class="badge bg-success">Issued</span>'
-            : '<span class="badge bg-warning text-dark">Not Issued</span>';
-
-        const paidBadge = item && item.is_paid
-            ? '<span class="badge bg-primary">Paid</span>'
-            : '<span class="badge bg-danger">Unpaid</span>';
-
-        const handedBadge = item && item.handed_over_at
-            ? '<span class="badge bg-info text-dark">Handed Over</span>'
-            : '';
-
         return `
             <div class="border rounded p-2 mb-2">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                     <strong>${escapeHtml(getMedicineName(item))}</strong>
-                    ${issueBadge}
-                    ${paidBadge}
-                    ${handedBadge}
+                    <span class="badge ${item?.is_issued ? 'bg-success' : 'bg-warning text-dark'}">
+                        ${item?.is_issued ? 'Issued' : 'Not Issued'}
+                    </span>
+                    <span class="badge ${item?.is_paid ? 'bg-primary' : 'bg-danger'}">
+                        ${item?.is_paid ? 'Paid' : 'Unpaid'}
+                    </span>
+                    ${item?.handed_over_at ? '<span class="badge bg-info text-dark">Handed Over</span>' : ''}
                 </div>
 
                 <div class="small">
-                    <div><span class="text-muted">Dosage:</span> ${escapeHtml(item ? item.dosage : '—')}</div>
-                    <div><span class="text-muted">Duration:</span> ${escapeHtml(item ? item.duration_days : '—')} day(s)</div>
-                    <div><span class="text-muted">Instruction:</span> ${escapeHtml(item ? item.instruction : '—')}</div>
+                    <div><span class="text-muted">Dosage:</span> ${escapeHtml(item?.dosage)}</div>
+                    <div><span class="text-muted">Duration:</span> ${escapeHtml(item?.duration_days)} day(s)</div>
+                    <div><span class="text-muted">Instruction:</span> ${escapeHtml(item?.instruction)}</div>
                 </div>
 
-                <div class="small text-muted mt-1">Issued at: ${formatDateTime(item ? item.issued_at : null)}</div>
-                <div class="small text-muted">Paid at: ${formatDateTime(item ? item.paid_at : null)}</div>
-                <div class="small text-muted">Handed over at: ${formatDateTime(item ? item.handed_over_at : null)}</div>
+                <div class="small text-muted mt-1">Issued at: ${escapeHtml(formatDateTime(item?.issued_at))}</div>
+                <div class="small text-muted">Paid at: ${escapeHtml(formatDateTime(item?.paid_at))}</div>
+                <div class="small text-muted">Handed over at: ${escapeHtml(formatDateTime(item?.handed_over_at))}</div>
             </div>
         `;
     }).join('');
@@ -423,34 +405,25 @@ function renderMedicinePaymentDetails(medicineOrders) {
     let grandTotal = 0;
 
     const html = meds.map(item => {
-        const issues = safeArray(item ? item.pharmacyIssues : []);
-
+        const issues = safeArray(item?.pharmacy_issues);
         let orderTotal = 0;
 
         const issuesHtml = issues.length
             ? issues.map(issue => {
-                const qty = parseFloat(issue && issue.quantity_issued ? issue.quantity_issued : 0) || 0;
-                const unitPrice = parseFloat(issue && issue.unit_price ? issue.unit_price : 0) || 0;
-                const totalAmount = parseFloat(issue && issue.total_amount ? issue.total_amount : (qty * unitPrice)) || 0;
-
+                const qty = parseFloat(issue?.quantity_issued ?? 0) || 0;
+                const unitPrice = parseFloat(issue?.unit_price ?? 0) || 0;
+                const totalAmount = parseFloat(issue?.total_amount ?? (qty * unitPrice)) || 0;
                 orderTotal += totalAmount;
-
-                let issuedByName = '—';
-                if (issue && issue.issued_by && typeof issue.issued_by === 'object' && issue.issued_by.name) {
-                    issuedByName = issue.issued_by.name;
-                } else if (issue && issue.issuedBy && issue.issuedBy.name) {
-                    issuedByName = issue.issuedBy.name;
-                }
 
                 return `
                     <div class="border rounded p-2 mb-2 bg-light">
-                        <div><strong>Batch:</strong> ${escapeHtml(issue ? issue.batch_no : '—')}</div>
-                        <div class="small"><span class="text-muted">Qty Issued:</span> ${escapeHtml(issue ? issue.quantity_issued : '—')}</div>
-                        <div class="small"><span class="text-muted">Unit Price:</span> ${money(issue ? issue.unit_price : 0)}</div>
+                        <div><strong>Batch:</strong> ${escapeHtml(issue?.batch_no)}</div>
+                        <div class="small"><span class="text-muted">Qty Issued:</span> ${escapeHtml(issue?.quantity_issued)}</div>
+                        <div class="small"><span class="text-muted">Unit Price:</span> ${money(issue?.unit_price)}</div>
                         <div class="small"><span class="text-muted">Total Amount:</span> ${money(totalAmount)}</div>
-                        <div class="small"><span class="text-muted">Expiry:</span> ${formatDate(issue ? issue.expiry_date : null)}</div>
-                        <div class="small"><span class="text-muted">Issued At:</span> ${formatDateTime(issue ? issue.issued_at : null)}</div>
-                        <div class="small"><span class="text-muted">Issued By:</span> ${escapeHtml(issuedByName)}</div>
+                        <div class="small"><span class="text-muted">Expiry:</span> ${escapeHtml(formatDate(issue?.expiry_date))}</div>
+                        <div class="small"><span class="text-muted">Issued At:</span> ${escapeHtml(formatDateTime(issue?.issued_at))}</div>
+                        <div class="small"><span class="text-muted">Issued By:</span> ${escapeHtml(issue?.issued_by?.name)}</div>
                     </div>
                 `;
             }).join('')
@@ -462,9 +435,9 @@ function renderMedicinePaymentDetails(medicineOrders) {
             <div class="border rounded p-2 mb-2 bg-white">
                 <div class="mb-1"><strong>${escapeHtml(getMedicineName(item))}</strong></div>
                 <div class="small mb-2">
-                    <span class="text-muted">Payment:</span> ${item && item.is_paid ? 'Paid' : 'Unpaid'}
+                    <span class="text-muted">Payment:</span> ${item?.is_paid ? 'Paid' : 'Unpaid'}
                     &nbsp;|&nbsp;
-                    <span class="text-muted">Issue:</span> ${item && item.is_issued ? 'Issued' : 'Not Issued'}
+                    <span class="text-muted">Issue:</span> ${item?.is_issued ? 'Issued' : 'Not Issued'}
                 </div>
                 ${issuesHtml}
                 <div class="alert alert-secondary py-2 px-3 mb-0">
@@ -492,9 +465,7 @@ async function openHistoryModal(id) {
         const url = "{{ route('patients.history.data', ':id') }}".replace(':id', id);
 
         const res = await fetch(url, {
-            headers: {
-                'Accept': 'application/json'
-            }
+            headers: { 'Accept': 'application/json' }
         });
 
         if (!res.ok) {
@@ -503,11 +474,12 @@ async function openHistoryModal(id) {
 
         const data = await res.json();
 
-        if (!data || !data.success) {
-            throw new Error(data && data.message ? data.message : 'Failed to load history');
+        if (!data?.success) {
+            throw new Error(data?.message || 'Failed to load history');
         }
 
         const p = data.patient || {};
+        console.log(data.patient);
         const visits = safeArray(p.visits);
 
         $('#hmName').text(p.name || '—');
@@ -521,23 +493,23 @@ async function openHistoryModal(id) {
         let rows = '';
 
         visits.forEach(v => {
-            safeArray(v.procedures || v.procedureOrders).forEach(pr => {
+            safeArray(v?.procedures || v?.procedure_orders).forEach(pr => {
                 procedures.push({
-                    name: (pr && pr.procedure && (pr.procedure.procedure_name || pr.procedure.name)) ? (pr.procedure.procedure_name || pr.procedure.name) : 'Procedure',
-                    date: formatDate(v ? v.visit_date : null),
+                    name: pr?.procedure?.procedure_name ?? pr?.procedure?.name ?? 'Procedure',
+                    date: formatDate(v?.visit_date),
                     doctor: getDoctorName(v)
                 });
             });
 
             rows += `
                 <tr>
-                    <td>${formatDate(v ? v.visit_date : null)}</td>
-                    <td>${escapeHtml(v ? v.visit_time : '—')}</td>
+                    <td>${escapeHtml(formatDate(v?.visit_date))}</td>
+                    <td>${escapeHtml(v?.visit_time ?? '—')}</td>
                     <td>${escapeHtml(getDoctorName(v))}</td>
                     <td>${escapeHtml(getNotes(v))}</td>
-                    <td>${renderLabs(v ? v.labOrders : [])}</td>
-                    <td>${renderMedicines(v ? v.medicineOrders : [])}</td>
-                    <td>${renderMedicinePaymentDetails(v ? v.medicineOrders : [])}</td>
+                    <td>${renderLabs(v?.lab_orders)}</td>
+                    <td>${renderMedicines(v?.medicine_orders)}</td>
+                    <td>${renderMedicinePaymentDetails(v?.medicine_orders)}</td>
                 </tr>
             `;
         });
