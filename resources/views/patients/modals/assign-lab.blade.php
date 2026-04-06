@@ -1,3 +1,9 @@
+@php
+    $labTests = \App\Models\LabTestMaster::query()
+        ->orderBy('test_name')
+        ->get();
+@endphp
+
 <div class="modal fade" id="assignLabModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <form id="assignLabForm" class="modal-content border-0 rounded-4">
@@ -19,14 +25,27 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">Lab Tests <span class="text-danger">*</span></label>
+
+                    <div class="alert alert-secondary">
+    Total Lab Tests: {{ $labTests->count() }}
+</div>
                     <select name="lab_tests[]" id="assign-lab-tests" class="form-select" multiple="multiple" style="width:100%;">
-                        @foreach(\App\Models\LabTestMaster::active()->orderBy('test_name')->get() as $test)
+                        @foreach($labTests as $test)
                             <option value="{{ $test->id }}">
-                                {{ $test->test_name }} — {{ number_format($test->price) }} Tsh
+                                {{ $test->test_name }} — {{ number_format($test->price ?? 0) }} Tsh
                             </option>
                         @endforeach
                     </select>
-                    <small class="text-muted">Search and select one or more lab tests</small>
+
+                    @if($labTests->isEmpty())
+                        <small class="text-danger d-block mt-2">
+                            No lab tests found in database.
+                        </small>
+                    @else
+                        <small class="text-muted d-block mt-2">
+                            Search and select one or more lab tests
+                        </small>
+                    @endif
                 </div>
 
                 <div class="mb-3">
@@ -66,14 +85,22 @@ function openAssignLabModal(id, name, code) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    const $assignLabSelect = $('#assign-lab-tests');
+    const modalEl = document.getElementById('assignLabModal');
 
-    if ($assignLabSelect.length) {
-        $assignLabSelect.select2({
-            placeholder: 'Search and select lab tests...',
-            allowClear: true,
-            width: '100%',
-            dropdownParent: $('#assignLabModal')
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', function () {
+            const $assignLabSelect = $('#assign-lab-tests');
+
+            if ($assignLabSelect.hasClass('select2-hidden-accessible')) {
+                $assignLabSelect.select2('destroy');
+            }
+
+            $assignLabSelect.select2({
+                placeholder: 'Search and select lab tests...',
+                allowClear: true,
+                width: '100%',
+                dropdownParent: $('#assignLabModal')
+            });
         });
     }
 
@@ -108,8 +135,7 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(data => {
             alert(data.message || 'Lab assigned successfully!');
-            const modalEl = document.getElementById('assignLabModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('assignLabModal'));
             if (modal) modal.hide();
             location.reload();
         })
