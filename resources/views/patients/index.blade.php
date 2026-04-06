@@ -62,6 +62,7 @@
 @include('patients.modals.view')
 @include('patients.modals.visit')
 @include('patients.modals.edit')
+@include('patients.modals.assign-lab')
 
 <style>
 .hover-lift { transition: all .3s cubic-bezier(.34,1.56,.64,1); }

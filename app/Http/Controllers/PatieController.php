@@ -219,49 +219,73 @@ public function sendRchToLab(Request $request, Patient $patient)
         ], 422);
     }
 
+    if (!$patient->is_active || $patient->isExpired()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Patient card is expired or inactive.'
+        ], 403);
+    }
+
     DB::beginTransaction();
 
     try {
-        $visit = Visit::create([
-            'patient_id' => $patient->id,
-            'doctor_id' => null,
-            'visit_date' => now()->toDateString(),
-            'visit_time' => now(),
-            'visit_type' => 'lab_only',
-            'source' => 'rch_direct',
-            'status' => 'sent_to_lab',
-            'registration_amount' => 0,
-            'registration_paid' => true,
-            'all_services_completed' => false,
-        ]);
+        $visit = Visit::where('patient_id', $patient->id)
+            ->where('created_at', '>=', now()->subHours(72))
+            ->where('source', 'rch_direct')
+            ->whereIn('status', ['sent_to_lab', 'consulting', 'follow_up'])
+            ->latest()
+            ->first();
 
-        // optional note into vitals/clinical note area if you want history trace
+        if (!$visit) {
+            $visit = Visit::create([
+                'patient_id'             => $patient->id,
+                'doctor_id'              => null,
+                'visit_date'             => now()->toDateString(),
+                'visit_time'             => now(),
+                'visit_type'             => 'lab_only',
+                'source'                 => 'rch_direct',
+                'status'                 => 'sent_to_lab',
+                'registration_amount'    => 0,
+                'registration_paid'      => true,
+                'all_services_completed' => false,
+            ]);
+        }
+
         $visit->vitals()->updateOrCreate(
             ['visit_id' => $visit->id],
             [
                 'chief_complaint' => 'RCH direct lab request',
-                'diagnosis' => $request->notes,
+                'history'         => $request->notes,
+                'diagnosis'       => $request->notes,
             ]
         );
 
         foreach ($request->lab_tests as $testId) {
-            VisitLabOrder::create([
-                'visit_id' => $visit->id,
-                'lab_test_id' => $testId,
-                'extra_instruction' => $request->lab_instruction ?? '',
-            ]);
+            VisitLabOrder::firstOrCreate(
+                [
+                    'visit_id' => $visit->id,
+                    'lab_test_id' => $testId,
+                ],
+                [
+                    'extra_instruction' => $request->lab_instruction ?? '',
+                ]
+            );
         }
 
         DB::commit();
 
         return response()->json([
             'success' => true,
-            'message' => 'RCH patient sent directly to lab successfully.',
+            'message' => 'RCH patient assigned to lab successfully.',
             'visit_id' => $visit->id,
         ]);
     } catch (\Throwable $e) {
         DB::rollBack();
-        Log::error('RCH direct lab failed: ' . $e->getMessage());
+
+        Log::error('RCH direct lab failed: ' . $e->getMessage(), [
+            'patient_id' => $patient->id,
+            'request' => $request->all(),
+        ]);
 
         return response()->json([
             'success' => false,
