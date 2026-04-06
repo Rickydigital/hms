@@ -16,9 +16,10 @@ protected $fillable = [
     'patient_id',
     'name',
     'age',
-    'age_months',     // ← added
-    'age_days',       // ← added
+    'age_months',
+    'age_days',
     'gender',
+    'is_rch',
     'phone',
     'address',
     'registration_date',
@@ -32,6 +33,7 @@ protected $casts = [
     'registration_date'     => 'datetime:Y-m-d',
     'expiry_date'           => 'datetime:Y-m-d',
     'is_active'             => 'boolean',
+    'is_rch'                => 'boolean',
     'reactivation_fee_paid' => 'string',
     'total_visits'          => 'integer',
     'age_months'            => 'integer',

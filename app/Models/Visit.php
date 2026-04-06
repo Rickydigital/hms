@@ -9,27 +9,29 @@ class Visit extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'patient_id',
-        'doctor_id',
-        'visit_date',
-        'visit_time',
-        'status',
-        'registration_amount',
-        'registration_paid',
-        'all_services_completed',
-    ];
+   protected $fillable = [
+    'patient_id',
+    'doctor_id',
+    'visit_date',
+    'visit_time',
+    'visit_type',
+    'source',
+    'status',
+    'registration_amount',
+    'registration_paid',
+    'all_services_completed',
+];
 
-    protected function casts(): array
-    {
-        return [
-            'visit_date' => 'date',
-            'visit_time' => 'datetime:H:i',
-            'registration_paid' => 'boolean',
-            'all_services_completed' => 'boolean',
-            'registration_amount' => 'decimal:2',
-        ];
-    }
+protected function casts(): array
+{
+    return [
+        'visit_date' => 'date',
+        'visit_time' => 'datetime:H:i',
+        'registration_paid' => 'boolean',
+        'all_services_completed' => 'boolean',
+        'registration_amount' => 'decimal:2',
+    ];
+}
 
     // Relationships
     public function patient()

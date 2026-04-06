@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Patient;
-use App\Models\Setting;          
+use App\Models\Setting;
+use App\Models\Visit;
+use App\Models\VisitLabOrder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
@@ -59,6 +61,7 @@ public function store(Request $request)
         'gender'      => 'required|in:Male,Female,Other',
         'phone' => 'nullable|string|max:15',
         'address'     => 'nullable|string|max:500',
+        'is_rch' => 'nullable|boolean',
     ]);
 
     
@@ -74,6 +77,7 @@ public function store(Request $request)
                 'gender'            => $request->gender,
                 'phone'             => $request->phone,
                 'address'           => $request->address ?? null,
+                'is_rch' => (bool) $request->is_rch,
                 'registration_date' => now(),
                 'expiry_date'       => now()->addMonths(
                     (int) Setting::get('card_validity_months', 12)
@@ -197,6 +201,73 @@ public function historySearch(Request $request)
             ];
         })
     ]);
+}
+
+public function sendRchToLab(Request $request, Patient $patient)
+{
+    $request->validate([
+        'lab_tests' => 'required|array|min:1',
+        'lab_tests.*' => 'exists:lab_tests_master,id',
+        'lab_instruction' => 'nullable|string',
+        'notes' => 'nullable|string',
+    ]);
+
+    if (!$patient->is_rch) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Only RCH patients can be sent directly to lab.'
+        ], 422);
+    }
+
+    DB::beginTransaction();
+
+    try {
+        $visit = Visit::create([
+            'patient_id' => $patient->id,
+            'doctor_id' => null,
+            'visit_date' => now()->toDateString(),
+            'visit_time' => now(),
+            'visit_type' => 'lab_only',
+            'source' => 'rch_direct',
+            'status' => 'sent_to_lab',
+            'registration_amount' => 0,
+            'registration_paid' => true,
+            'all_services_completed' => false,
+        ]);
+
+        // optional note into vitals/clinical note area if you want history trace
+        $visit->vitals()->updateOrCreate(
+            ['visit_id' => $visit->id],
+            [
+                'chief_complaint' => 'RCH direct lab request',
+                'diagnosis' => $request->notes,
+            ]
+        );
+
+        foreach ($request->lab_tests as $testId) {
+            VisitLabOrder::create([
+                'visit_id' => $visit->id,
+                'lab_test_id' => $testId,
+                'extra_instruction' => $request->lab_instruction ?? '',
+            ]);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'RCH patient sent directly to lab successfully.',
+            'visit_id' => $visit->id,
+        ]);
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        Log::error('RCH direct lab failed: ' . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to send patient to lab.'
+        ], 500);
+    }
 }
 
 public function historyData(Patient $patient)

@@ -12,12 +12,12 @@ class OpdDoctorController extends Controller
     public function index()
     {
         $todayQueue = Visit::with(['patient', 'vitals'])
-            ->whereDate('visit_date', today())
+            ->where('created_at', '>=', now()->subHours(72))
             ->where('status', 'in_opd')
-            ->orderBy('visit_time')
+            ->orderByDesc('created_at')
             ->get();
 
-        $completedToday = Visit::whereDate('visit_date', today())
+        $completedToday = Visit::where('created_at', '>=', now()->subHours(72))
             ->where('status', 'completed')
             ->count();
 

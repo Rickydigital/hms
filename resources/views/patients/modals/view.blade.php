@@ -53,6 +53,16 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="col-12">
+                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
+                            <i class="bi bi-tag text-primary fs-4"></i>
+                            <div>
+                                <small class="text-muted">Category</small>
+                                <p id="view-category" class="mb-0 fw-medium"></p>
+                            </div>
+                        </div>
+                    </div>
                     <div class="col-12">
                         <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
                             <i class="bi bi-credit-card-2-front fs-4"></i>
@@ -78,6 +88,7 @@
 function showPatient(patient) {
     document.getElementById('view-name').textContent = patient.name;
     document.getElementById('view-id').textContent = patient.patient_id;
+    document.getElementById('view-category').textContent = patient.is_rch ? 'RCH' : 'General';
 
     // === Smart & Complete Age Display ===
     const parts = [];

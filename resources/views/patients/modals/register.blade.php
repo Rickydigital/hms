@@ -53,6 +53,14 @@
                             <option value="Other">Other</option>
                         </select>
                     </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-medium">Patient Category</label>
+                        <select name="is_rch" class="form-select rounded-3">
+                            <option value="0">General</option>
+                            <option value="1">RCH</option>
+                        </select>
+                    </div>
                     <div class="col-md-6">
                         <label class="form-label fw-medium">Phone Number (Optional)</label>
                         <input type="text" name="phone" class="form-control rounded-3">
