@@ -333,22 +333,41 @@ function renderLabs(labOrders) {
     return labs.map(lab => {
         const result = lab?.result ?? null;
 
+        const paidBadge = lab?.is_paid
+            ? '<span class="badge bg-success">Paid</span>'
+            : '<span class="badge bg-danger">Unpaid</span>';
+
+        const completedBadge = lab?.is_completed
+            ? '<span class="badge bg-primary">Completed</span>'
+            : '<span class="badge bg-warning text-dark">Pending</span>';
+
+        const abnormalBadge = result?.is_abnormal
+            ? '<span class="badge bg-danger">Abnormal</span>'
+            : '';
+
+        let finalResult = '—';
+
+        if (result) {
+            if (result.result_value && result.result_text) {
+                finalResult = `${result.result_value} (${result.result_text})`;
+            } else if (result.result_value) {
+                finalResult = result.result_value;
+            } else if (result.result_text) {
+                finalResult = result.result_text;
+            }
+        }
+
         return `
             <div class="border rounded p-2 mb-2 bg-light">
                 <div class="d-flex flex-wrap gap-1 mb-1">
                     <strong>${escapeHtml(getLabTestName(lab))}</strong>
-                    <span class="badge ${lab?.is_paid ? 'bg-success' : 'bg-danger'}">
-                        ${lab?.is_paid ? 'Paid' : 'Unpaid'}
-                    </span>
-                    <span class="badge ${lab?.is_completed ? 'bg-primary' : 'bg-warning text-dark'}">
-                        ${lab?.is_completed ? 'Completed' : 'Pending'}
-                    </span>
-                    ${result?.is_abnormal ? '<span class="badge bg-danger">Abnormal</span>' : ''}
+                    ${paidBadge}
+                    ${completedBadge}
+                    ${abnormalBadge}
                 </div>
 
                 <div class="small">
-                    <div><span class="text-muted">Value:</span> ${escapeHtml(result?.result_value)}</div>
-                    <div><span class="text-muted">Text:</span> ${escapeHtml(result?.result_text)}</div>
+                    <div><span class="text-muted">Result:</span> ${escapeHtml(finalResult)}</div>
                     <div><span class="text-muted">Normal Range:</span> ${escapeHtml(result?.normal_range)}</div>
                     <div><span class="text-muted">Remarks:</span> ${escapeHtml(result?.remarks)}</div>
                 </div>
@@ -359,7 +378,6 @@ function renderLabs(labOrders) {
         `;
     }).join('');
 }
-
 function renderMedicines(medicineOrders) {
     const meds = safeArray(medicineOrders);
 
