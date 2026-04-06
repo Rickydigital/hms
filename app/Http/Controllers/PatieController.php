@@ -227,8 +227,6 @@ public function sendRchToLab(Request $request, Patient $patient)
     $request->validate([
         'lab_tests' => 'required|array|min:1',
         'lab_tests.*' => 'exists:lab_tests_master,id',
-        'lab_instruction' => 'nullable|string',
-        'notes' => 'nullable|string',
     ]);
 
     if (!$patient->is_rch) {
@@ -274,20 +272,16 @@ public function sendRchToLab(Request $request, Patient $patient)
             ['visit_id' => $visit->id],
             [
                 'chief_complaint' => 'RCH direct lab request',
-                'history'         => $request->notes,
-                'diagnosis'       => $request->notes,
             ]
         );
 
-        foreach ($request->lab_tests as $testId) {
-            VisitLabOrder::firstOrCreate(
+        foreach ((array) $request->lab_tests as $testId) {
+            VisitLabOrder::updateOrCreate(
                 [
-                    'visit_id' => $visit->id,
+                    'visit_id'    => $visit->id,
                     'lab_test_id' => $testId,
                 ],
-                [
-                    'extra_instruction' => $request->lab_instruction ?? '',
-                ]
+                []
             );
         }
 

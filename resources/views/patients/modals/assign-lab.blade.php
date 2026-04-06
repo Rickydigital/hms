@@ -26,7 +26,6 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold">Lab Tests <span class="text-danger">*</span></label>
 
-                    
                     <select name="lab_tests[]" id="assign-lab-tests" class="form-select" multiple="multiple" style="width:100%;">
                         @foreach($labTests as $test)
                             <option value="{{ $test->id }}">
@@ -44,18 +43,6 @@
                             Search and select one or more lab tests
                         </small>
                     @endif
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Lab Instruction</label>
-                    <textarea name="lab_instruction" rows="2" class="form-control rounded-3"
-                              placeholder="Special instruction for lab..."></textarea>
-                </div>
-
-                <div class="mb-0">
-                    <label class="form-label fw-bold">Notes</label>
-                    <textarea name="notes" rows="2" class="form-control rounded-3"
-                              placeholder="Optional note..."></textarea>
                 </div>
             </div>
 
@@ -97,7 +84,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 placeholder: 'Search and select lab tests...',
                 allowClear: true,
                 width: '100%',
-                dropdownParent: $('#assignLabModal')
+                dropdownParent: $('#assignLabModal'),
+                closeOnSelect: false
             });
         });
     }
