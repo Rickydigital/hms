@@ -204,7 +204,7 @@
                     {{-- Visits --}}
                     <div class="table-responsive">
                         <table class="table table-bordered">
-                            <thead class="table-light">
+                           <thead class="table-light">
                                 <tr>
                                     <th>Date</th>
                                     <th>Time</th>
@@ -232,7 +232,6 @@
 
 <script>
 $(function () {
-
     $('#historyPatientSearch').select2({
         placeholder: 'Search patient...',
         minimumInputLength: 1,
@@ -250,10 +249,8 @@ $(function () {
         openHistoryModal(e.params.data.id);
         new bootstrap.Modal('#patientHistoryModal').show();
     });
-
 });
 
-// auto open from query string
 $(function () {
     const params = new URLSearchParams(window.location.search);
     const patientId = params.get('open');
@@ -263,22 +260,12 @@ $(function () {
     }
 });
 
-function formatDate(dateStr) {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toISOString().split('T')[0];
-}
-
-function formatDateTime(dateStr) {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleString();
+function safeArray(value) {
+    return Array.isArray(value) ? value : [];
 }
 
 function escapeHtml(value) {
-    if (value === null || value === undefined) return '';
+    if (value === null || value === undefined) return '—';
     return String(value)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -292,142 +279,178 @@ function money(value) {
     return isNaN(num) ? '0.00' : num.toFixed(2);
 }
 
+function formatDate(value) {
+    if (!value) return '—';
+    try {
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return escapeHtml(value);
+        return d.toISOString().split('T')[0];
+    } catch (e) {
+        return escapeHtml(value);
+    }
+}
+
+function formatDateTime(value) {
+    if (!value) return '—';
+    try {
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return escapeHtml(value);
+        return d.toLocaleString();
+    } catch (e) {
+        return escapeHtml(value);
+    }
+}
+
+function getDoctorName(v) {
+    return v && v.doctor && v.doctor.name ? v.doctor.name : '—';
+}
+
+function getNotes(v) {
+    if (v && v.vitals && v.vitals.diagnosis) return v.vitals.diagnosis;
+    if (v && v.notes) return v.notes;
+    return '—';
+}
+
 function getLabTestName(lab) {
-    return lab?.test?.name
-        ?? lab?.test?.test_name
-        ?? lab?.test?.lab_test_name
-        ?? 'Lab Test';
+    if (lab && lab.test) {
+        return lab.test.name || lab.test.test_name || lab.test.lab_test_name || 'Lab Test';
+    }
+    return 'Lab Test';
 }
 
 function getMedicineName(item) {
-    return item?.medicine?.name
-        ?? item?.medicine?.medicine_name
-        ?? item?.medicine?.drug_name
-        ?? 'Medicine';
+    if (item && item.medicine) {
+        return item.medicine.name || item.medicine.medicine_name || item.medicine.drug_name || 'Medicine';
+    }
+    return 'Medicine';
 }
 
 function renderLabs(labOrders) {
-    if (!labOrders || !labOrders.length) {
+    const labs = safeArray(labOrders);
+
+    if (!labs.length) {
         return '<span class="text-muted">No lab tests</span>';
     }
 
-    return labOrders.map(lab => {
-        const testName = getLabTestName(lab);
+    return labs.map(lab => {
+        const result = lab && lab.result ? lab.result : null;
 
-        const paidBadge = lab.is_paid
+        const paidBadge = lab && lab.is_paid
             ? '<span class="badge bg-success">Paid</span>'
             : '<span class="badge bg-danger">Unpaid</span>';
 
-        const completedBadge = lab.is_completed
+        const completedBadge = lab && lab.is_completed
             ? '<span class="badge bg-primary">Completed</span>'
             : '<span class="badge bg-warning text-dark">Pending</span>';
 
-        const abnormalBadge = lab.result?.is_abnormal
+        const abnormalBadge = result && result.is_abnormal
             ? '<span class="badge bg-danger">Abnormal</span>'
-            : (lab.result ? '<span class="badge bg-secondary">Reported</span>' : '');
-
-        let resultHtml = '<div class="small text-muted">No result yet</div>';
-
-        if (lab.result) {
-            resultHtml = `
-                <div class="small">
-                    <div><span class="text-muted">Value:</span> ${escapeHtml(lab.result.result_value ?? '—')}</div>
-                    <div><span class="text-muted">Text:</span> ${escapeHtml(lab.result.result_text ?? '—')}</div>
-                    <div><span class="text-muted">Normal Range:</span> ${escapeHtml(lab.result.normal_range ?? '—')}</div>
-                    <div><span class="text-muted">Remarks:</span> ${escapeHtml(lab.result.remarks ?? '—')}</div>
-                </div>
-            `;
-        }
+            : (result ? '<span class="badge bg-secondary">Reported</span>' : '');
 
         return `
             <div class="border rounded p-2 mb-2 bg-light">
                 <div class="d-flex flex-wrap gap-1 mb-1">
-                    <strong>${escapeHtml(testName)}</strong>
+                    <strong>${escapeHtml(getLabTestName(lab))}</strong>
                     ${paidBadge}
                     ${completedBadge}
                     ${abnormalBadge}
                 </div>
-                ${resultHtml}
-                ${lab.paid_at ? `<div class="small text-muted mt-1">Paid at: ${escapeHtml(formatDateTime(lab.paid_at))}</div>` : ''}
-                ${lab.completed_at ? `<div class="small text-muted">Completed at: ${escapeHtml(formatDateTime(lab.completed_at))}</div>` : ''}
+
+                <div class="small">
+                    <div><span class="text-muted">Value:</span> ${escapeHtml(result ? result.result_value : '—')}</div>
+                    <div><span class="text-muted">Text:</span> ${escapeHtml(result ? result.result_text : '—')}</div>
+                    <div><span class="text-muted">Normal Range:</span> ${escapeHtml(result ? result.normal_range : '—')}</div>
+                    <div><span class="text-muted">Remarks:</span> ${escapeHtml(result ? result.remarks : '—')}</div>
+                </div>
+
+                <div class="small text-muted mt-1">Paid at: ${formatDateTime(lab ? lab.paid_at : null)}</div>
+                <div class="small text-muted">Completed at: ${formatDateTime(lab ? lab.completed_at : null)}</div>
             </div>
         `;
     }).join('');
 }
 
 function renderMedicines(medicineOrders) {
-    if (!medicineOrders || !medicineOrders.length) {
+    const meds = safeArray(medicineOrders);
+
+    if (!meds.length) {
         return '<span class="text-muted">No medicines</span>';
     }
 
-    return medicineOrders.map(item => {
-        const medName = getMedicineName(item);
-
-        const issueBadge = item.is_issued
+    return meds.map(item => {
+        const issueBadge = item && item.is_issued
             ? '<span class="badge bg-success">Issued</span>'
             : '<span class="badge bg-warning text-dark">Not Issued</span>';
 
-        const paidBadge = item.is_paid
+        const paidBadge = item && item.is_paid
             ? '<span class="badge bg-primary">Paid</span>'
             : '<span class="badge bg-danger">Unpaid</span>';
 
-        const handedBadge = item.handed_over_at
+        const handedBadge = item && item.handed_over_at
             ? '<span class="badge bg-info text-dark">Handed Over</span>'
             : '';
 
         return `
             <div class="border rounded p-2 mb-2">
                 <div class="d-flex flex-wrap gap-1 mb-1">
-                    <strong>${escapeHtml(medName)}</strong>
+                    <strong>${escapeHtml(getMedicineName(item))}</strong>
                     ${issueBadge}
                     ${paidBadge}
                     ${handedBadge}
                 </div>
 
                 <div class="small">
-                    <div><span class="text-muted">Dosage:</span> ${escapeHtml(item.dosage ?? '—')}</div>
-                    <div><span class="text-muted">Duration:</span> ${escapeHtml(item.duration_days ?? '—')} day(s)</div>
-                    <div><span class="text-muted">Instruction:</span> ${escapeHtml(item.instruction ?? '—')}</div>
+                    <div><span class="text-muted">Dosage:</span> ${escapeHtml(item ? item.dosage : '—')}</div>
+                    <div><span class="text-muted">Duration:</span> ${escapeHtml(item ? item.duration_days : '—')} day(s)</div>
+                    <div><span class="text-muted">Instruction:</span> ${escapeHtml(item ? item.instruction : '—')}</div>
                 </div>
 
-                ${item.issued_at ? `<div class="small text-muted mt-1">Issued at: ${escapeHtml(formatDateTime(item.issued_at))}</div>` : ''}
-                ${item.paid_at ? `<div class="small text-muted">Paid at: ${escapeHtml(formatDateTime(item.paid_at))}</div>` : ''}
-                ${item.handed_over_at ? `<div class="small text-muted">Handed over at: ${escapeHtml(formatDateTime(item.handed_over_at))}</div>` : ''}
+                <div class="small text-muted mt-1">Issued at: ${formatDateTime(item ? item.issued_at : null)}</div>
+                <div class="small text-muted">Paid at: ${formatDateTime(item ? item.paid_at : null)}</div>
+                <div class="small text-muted">Handed over at: ${formatDateTime(item ? item.handed_over_at : null)}</div>
             </div>
         `;
     }).join('');
 }
 
 function renderMedicinePaymentDetails(medicineOrders) {
-    if (!medicineOrders || !medicineOrders.length) {
+    const meds = safeArray(medicineOrders);
+
+    if (!meds.length) {
         return '<span class="text-muted">No medicine payment details</span>';
     }
 
     let grandTotal = 0;
 
-    const html = medicineOrders.map(item => {
-        const medName = getMedicineName(item);
-        const issues = item.pharmacyIssues || [];
+    const html = meds.map(item => {
+        const issues = safeArray(item ? item.pharmacyIssues : []);
 
         let orderTotal = 0;
 
         const issuesHtml = issues.length
             ? issues.map(issue => {
-                const qty = parseFloat(issue.quantity_issued ?? 0) || 0;
-                const unitPrice = parseFloat(issue.unit_price ?? 0) || 0;
-                const totalAmount = parseFloat(issue.total_amount ?? (qty * unitPrice)) || 0;
+                const qty = parseFloat(issue && issue.quantity_issued ? issue.quantity_issued : 0) || 0;
+                const unitPrice = parseFloat(issue && issue.unit_price ? issue.unit_price : 0) || 0;
+                const totalAmount = parseFloat(issue && issue.total_amount ? issue.total_amount : (qty * unitPrice)) || 0;
 
                 orderTotal += totalAmount;
 
+                let issuedByName = '—';
+                if (issue && issue.issued_by && typeof issue.issued_by === 'object' && issue.issued_by.name) {
+                    issuedByName = issue.issued_by.name;
+                } else if (issue && issue.issuedBy && issue.issuedBy.name) {
+                    issuedByName = issue.issuedBy.name;
+                }
+
                 return `
                     <div class="border rounded p-2 mb-2 bg-light">
-                        <div><strong>Batch:</strong> ${escapeHtml(issue.batch_no ?? '—')}</div>
-                        <div class="small"><span class="text-muted">Qty Issued:</span> ${escapeHtml(issue.quantity_issued ?? '—')}</div>
-                        <div class="small"><span class="text-muted">Unit Price:</span> ${money(issue.unit_price)}</div>
+                        <div><strong>Batch:</strong> ${escapeHtml(issue ? issue.batch_no : '—')}</div>
+                        <div class="small"><span class="text-muted">Qty Issued:</span> ${escapeHtml(issue ? issue.quantity_issued : '—')}</div>
+                        <div class="small"><span class="text-muted">Unit Price:</span> ${money(issue ? issue.unit_price : 0)}</div>
                         <div class="small"><span class="text-muted">Total Amount:</span> ${money(totalAmount)}</div>
-                        <div class="small"><span class="text-muted">Expiry:</span> ${escapeHtml(formatDate(issue.expiry_date))}</div>
-                        <div class="small"><span class="text-muted">Issued At:</span> ${escapeHtml(formatDateTime(issue.issued_at))}</div>
-                        <div class="small"><span class="text-muted">Issued By:</span> ${escapeHtml(issue.issued_by?.name ?? issue.issuedBy?.name ?? '—')}</div>
+                        <div class="small"><span class="text-muted">Expiry:</span> ${formatDate(issue ? issue.expiry_date : null)}</div>
+                        <div class="small"><span class="text-muted">Issued At:</span> ${formatDateTime(issue ? issue.issued_at : null)}</div>
+                        <div class="small"><span class="text-muted">Issued By:</span> ${escapeHtml(issuedByName)}</div>
                     </div>
                 `;
             }).join('')
@@ -437,15 +460,15 @@ function renderMedicinePaymentDetails(medicineOrders) {
 
         return `
             <div class="border rounded p-2 mb-2 bg-white">
-                <div class="mb-1"><strong>${escapeHtml(medName)}</strong></div>
+                <div class="mb-1"><strong>${escapeHtml(getMedicineName(item))}</strong></div>
                 <div class="small mb-2">
-                    <span class="text-muted">Payment:</span> ${item.is_paid ? 'Paid' : 'Unpaid'}
+                    <span class="text-muted">Payment:</span> ${item && item.is_paid ? 'Paid' : 'Unpaid'}
                     &nbsp;|&nbsp;
-                    <span class="text-muted">Issue:</span> ${item.is_issued ? 'Issued' : 'Not Issued'}
+                    <span class="text-muted">Issue:</span> ${item && item.is_issued ? 'Issued' : 'Not Issued'}
                 </div>
                 ${issuesHtml}
                 <div class="alert alert-secondary py-2 px-3 mb-0">
-                    <strong>${escapeHtml(medName)} Total: ${money(orderTotal)}</strong>
+                    <strong>${escapeHtml(getMedicineName(item))} Total: ${money(orderTotal)}</strong>
                 </div>
             </div>
         `;
@@ -468,44 +491,53 @@ async function openHistoryModal(id) {
     try {
         const url = "{{ route('patients.history.data', ':id') }}".replace(':id', id);
 
-        const res = await fetch(url);
-        const data = await res.json();
+        const res = await fetch(url, {
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
 
-        if (!data.success) {
-            throw new Error(data.message || 'Failed to load history');
+        if (!res.ok) {
+            throw new Error('Failed to fetch patient history');
         }
 
-        const p = data.patient;
-        const visits = p.visits || [];
+        const data = await res.json();
 
-        $('#hmName').text(p.name ?? '—');
-        $('#hmId').text(p.patient_id ?? '—');
-        $('#hmPhone').text(p.phone ?? '—');
-        $('#hmAge').text(p.age_display ?? '—');
+        if (!data || !data.success) {
+            throw new Error(data && data.message ? data.message : 'Failed to load history');
+        }
+
+        const p = data.patient || {};
+        const visits = safeArray(p.visits);
+
+        $('#hmName').text(p.name || '—');
+        $('#hmId').text(p.patient_id || '—');
+        $('#hmPhone').text(p.phone || '—');
+        $('#hmAge').text(p.age_display || '—');
         $('#hmVisitsCount').text(visits.length);
-        $('#hmSubtitle').text((p.name ?? '') + ' • ' + (p.patient_id ?? ''));
+        $('#hmSubtitle').text((p.name || '') + ' • ' + (p.patient_id || ''));
 
         let procedures = [];
         let rows = '';
 
         visits.forEach(v => {
-            (v.procedures || v.procedureOrders || []).forEach(pr => {
+            safeArray(v.procedures || v.procedureOrders).forEach(pr => {
                 procedures.push({
-                    name: pr.procedure?.procedure_name ?? pr.procedure?.name ?? 'Procedure',
-                    date: formatDate(v.visit_date),
-                    doctor: v.doctor?.name ?? ''
+                    name: (pr && pr.procedure && (pr.procedure.procedure_name || pr.procedure.name)) ? (pr.procedure.procedure_name || pr.procedure.name) : 'Procedure',
+                    date: formatDate(v ? v.visit_date : null),
+                    doctor: getDoctorName(v)
                 });
             });
 
             rows += `
                 <tr>
-                    <td>${formatDate(v.visit_date)}</td>
-                    <td>${escapeHtml(v.visit_time ?? '—')}</td>
-                    <td>${escapeHtml(v.doctor?.name ?? '—')}</td>
-                    <td>${escapeHtml(v.vitals?.diagnosis ?? v.notes ?? '—')}</td>
-                    <td>${renderLabs(v.labOrders || [])}</td>
-                    <td>${renderMedicines(v.medicineOrders || [])}</td>
-                    <td>${renderMedicinePaymentDetails(v.medicineOrders || [])}</td>
+                    <td>${formatDate(v ? v.visit_date : null)}</td>
+                    <td>${escapeHtml(v ? v.visit_time : '—')}</td>
+                    <td>${escapeHtml(getDoctorName(v))}</td>
+                    <td>${escapeHtml(getNotes(v))}</td>
+                    <td>${renderLabs(v ? v.labOrders : [])}</td>
+                    <td>${renderMedicines(v ? v.medicineOrders : [])}</td>
+                    <td>${renderMedicinePaymentDetails(v ? v.medicineOrders : [])}</td>
                 </tr>
             `;
         });
@@ -529,8 +561,10 @@ async function openHistoryModal(id) {
         $('#hmContent').show();
 
     } catch (e) {
+        console.error('History modal error:', e);
         $('#hmLoading').hide();
         $('#hmError').removeClass('d-none').text(e.message || 'An error occurred');
+        $('#hmVisitsBody').html('<tr><td colspan="7" class="text-center text-danger">Failed to load visit details</td></tr>');
     }
 }
 </script>
