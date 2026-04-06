@@ -1,13 +1,15 @@
 @extends('components.main-layout')
-@section('title', 'Patient History')
+@section('title', $pageTitle ?? 'Patient History')
 
 @section('content')
 <div class="container-fluid py-3 py-md-4">
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h4 class="text-primary fw-bold mb-1">Patient History</h4>
-            <small class="text-muted">Search any patient and view full hospital history</small>
+            <h4 class="text-primary fw-bold mb-1">{{ $pageTitle ?? 'Patient History' }}</h4>
+<small class="text-muted">
+    {{ !empty($isRch) ? 'Search any RCH patient and view full RCH history' : 'Search any general patient and view full hospital history' }}
+</small>
         </div>
     </div>
 
@@ -238,7 +240,10 @@ $(function () {
         ajax: {
             url: "{{ route('patients.history.search') }}",
             dataType: 'json',
-            data: params => ({ term: params.term }),
+            data: params => ({
+                term: params.term,
+                is_rch: @json($isRch ?? false)
+            }),
             processResults: data => ({
                 results: data.results ?? []
             })
@@ -480,7 +485,8 @@ async function openHistoryModal(id) {
     $('#hmProcedures').html('Loading...');
 
     try {
-        const url = "{{ route('patients.history.data', ':id') }}".replace(':id', id);
+        const url = "{{ route('patients.history.data', ':id') }}"
+    .replace(':id', id) + '?is_rch=' + (@json(!empty($isRch)) ? '1' : '0');
 
         const res = await fetch(url, {
             headers: { 'Accept': 'application/json' }

@@ -26,9 +26,7 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold">Lab Tests <span class="text-danger">*</span></label>
 
-                    <div class="alert alert-secondary">
-    Total Lab Tests: {{ $labTests->count() }}
-</div>
+                    
                     <select name="lab_tests[]" id="assign-lab-tests" class="form-select" multiple="multiple" style="width:100%;">
                         @foreach($labTests as $test)
                             <option value="{{ $test->id }}">

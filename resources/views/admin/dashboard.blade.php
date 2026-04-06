@@ -19,7 +19,7 @@
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Patients</div>
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">General Patients</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 <span class="counter" data-target="{{ $total_patients }}">0</span>
                             </div>
@@ -31,6 +31,24 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+    <div class="card border-left-info shadow h-100 py-2">
+        <div class="card-body">
+            <div class="row no-gutters align-items-center">
+                <div class="col mr-2">
+                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">RCH Patients</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                        <span class="counter" data-target="{{ $total_rch_patients }}">0</span>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <i class="fas fa-baby fa-2x text-gray-300"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
         <!-- Today's OPD -->
         <div class="col-xl-3 col-md-6 mb-4">
@@ -253,6 +271,14 @@
                         <span class="small fw-bold">Patient History</span>
                     </a>
              </div>
+
+             <div class="col-md-3 col-6">
+                <a href="{{ route('patients.rch.history.index') }}" class="btn btn-outline-info w-100 py-3 shadow-sm">
+                    <i class="bi bi-clock-history fs-4"></i><br>
+                    <span class="small fw-bold">RCH History</span>
+                </a>
+            </div>
+
             </div>
         </div>
     </div>

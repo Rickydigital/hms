@@ -111,9 +111,18 @@ public function store(Request $request)
  */
 public function historyIndex(Request $request)
 {
-    $query = Patient::query();
+    return $this->renderHistoryPage($request, false, 'Patient History');
+}
 
-    // ✅ SEARCH FILTER
+public function rchHistoryIndex(Request $request)
+{
+    return $this->renderHistoryPage($request, true, 'RCH History');
+}
+
+private function renderHistoryPage(Request $request, bool $isRch, string $pageTitle)
+{
+    $query = Patient::query()->where('is_rch', $isRch);
+
     if ($request->filled('search')) {
         $search = trim($request->search);
         $query->where(function ($q) use ($search) {
@@ -123,7 +132,6 @@ public function historyIndex(Request $request)
         });
     }
 
-    // ✅ DATE FILTER (DEFAULT = THIS MONTH)
     $startDate = $request->start_date;
     $endDate   = $request->end_date;
 
@@ -132,39 +140,45 @@ public function historyIndex(Request $request)
         $endDate   = now()->endOfMonth()->toDateString();
     }
 
-    // ✅ CLONE for summary
     $summaryQuery = clone $query;
 
-    // =========================
-    // 📊 SUMMARY CALCULATIONS
-    // =========================
-
-    // Total patients (filtered by search only)
     $totalPatients = $summaryQuery->count();
 
-    // Total visits (FILTERED BY DATE)
+    $patientIds = $summaryQuery->pluck('id');
+
     $totalVisits = DB::table('visits')
         ->whereBetween('visit_date', [$startDate, $endDate])
-        ->whereIn('patient_id', $summaryQuery->pluck('id'))
+        ->whereIn('patient_id', $patientIds)
         ->count();
 
-    // Returning patients (visited in selected period)
-    $returningPatients = (clone $summaryQuery)
+    $returningPatients = Patient::where('is_rch', $isRch)
+        ->when($request->filled('search'), function ($q) use ($request) {
+            $search = trim($request->search);
+            $q->where(function ($qq) use ($search) {
+                $qq->where('name', 'like', "%{$search}%")
+                   ->orWhere('patient_id', 'like', "%{$search}%")
+                   ->orWhere('phone', 'like', "%{$search}%");
+            });
+        })
         ->whereHas('visits', function ($q) use ($startDate, $endDate) {
             $q->whereBetween('visit_date', [$startDate, $endDate]);
         })
         ->count();
 
-    // New patients (never visited EVER)
-   $newPatients = (clone $summaryQuery)
-    ->whereDoesntHave('visits', function ($q) use ($startDate) {
-        $q->where('visit_date', '<', $startDate);
-    })
-    ->count();
+    $newPatients = Patient::where('is_rch', $isRch)
+        ->when($request->filled('search'), function ($q) use ($request) {
+            $search = trim($request->search);
+            $q->where(function ($qq) use ($search) {
+                $qq->where('name', 'like', "%{$search}%")
+                   ->orWhere('patient_id', 'like', "%{$search}%")
+                   ->orWhere('phone', 'like', "%{$search}%");
+            });
+        })
+        ->whereDoesntHave('visits', function ($q) use ($startDate) {
+            $q->where('visit_date', '<', $startDate);
+        })
+        ->count();
 
-    // =========================
-    // 📄 PAGINATION
-    // =========================
     $patients = $query->orderBy('name')
         ->paginate(20)
         ->withQueryString();
@@ -176,15 +190,20 @@ public function historyIndex(Request $request)
         'newPatients',
         'returningPatients',
         'startDate',
-        'endDate'
+        'endDate',
+        'pageTitle',
+        'isRch'
     ));
 }
-
 public function historySearch(Request $request)
 {
     $term = trim($request->get('term') ?? '');
+    $isRch = filter_var($request->get('is_rch'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
 
     $patients = Patient::query()
+        ->when(!is_null($isRch), function ($q) use ($isRch) {
+            $q->where('is_rch', $isRch);
+        })
         ->where(function ($q) use ($term) {
             $q->where('name', 'like', "%{$term}%")
               ->orWhere('patient_id', 'like', "%{$term}%")
@@ -294,8 +313,17 @@ public function sendRchToLab(Request $request, Patient $patient)
     }
 }
 
-public function historyData(Patient $patient)
+public function historyData(Request $request, Patient $patient)
 {
+    $isRch = filter_var($request->get('is_rch'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+    if (!is_null($isRch) && (bool) $patient->is_rch !== $isRch) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Patient type mismatch.'
+        ], 404);
+    }
+
     $patient->load([
         'visits' => function ($q) {
             $q->latest('visit_date')

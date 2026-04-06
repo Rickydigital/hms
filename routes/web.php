@@ -76,6 +76,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/patients/{patient}/visit', [VisitController::class, 'store'])->name('patients.visit.store');
     Route::post('patients/{patient}/reactivate', [PatieController::class, 'reactivate'])->name('patients.reactivate');
     Route::get('/patient-history', [PatieController::class, 'historyIndex'])->name('patients.history.index');
+    Route::get('/patients/rch-history', [PatieController::class, 'rchHistoryIndex'])->name('patients.rch.history.index');
     Route::post('/patients/{patient}/rch-direct-lab', [PatieController::class, 'sendRchToLab'])
         ->name('patients.rch.direct.lab');
     Route::get('/patient-history/search', [PatieController::class, 'historySearch'])->name('patients.history.search');
