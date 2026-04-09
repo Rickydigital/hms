@@ -34,10 +34,13 @@ class DoctorController extends Controller
     public function index(Request $request)
     {
         $todayVisits = Visit::with('patient')
-            ->whereDate('visit_date', today())
+            ->whereBetween('visit_date', [
+                now()->subDays(2)->toDateString(),
+                now()->toDateString()
+            ])
+            ->orderByDesc('visit_date')
             ->orderBy('visit_time')
             ->get();
-
         $visit = null;
 
         if ($request->filled('patient_id')) {
@@ -79,7 +82,10 @@ class DoctorController extends Controller
             'bedAdmission.ward'
         ]);
 
-        $todayVisits = Visit::whereDate('visit_date', today())
+        $todayVisits = Visit::with('patient')
+            ->whereDate('visit_date', '>=', now()->subDays(2)->toDateString())
+            ->whereDate('visit_date', '<=', now()->toDateString())
+            ->orderByDesc('visit_date')
             ->orderBy('visit_time')
             ->get();
 
@@ -264,8 +270,8 @@ class DoctorController extends Controller
             $visit->update([
                 'status' => $hasLab ? 'sent_to_lab'
                     : ($hasProcedure ? 'sent_to_procedure'
-                    : (($hasMedicine || $hasInjection) ? 'sent_to_pharmacy'
-                    : ($hasAdmission ? 'admitted' : 'consulting'))),
+                        : (($hasMedicine || $hasInjection) ? 'sent_to_pharmacy'
+                            : ($hasAdmission ? 'admitted' : 'consulting'))),
                 'all_services_completed' => false
             ]);
         } else {
