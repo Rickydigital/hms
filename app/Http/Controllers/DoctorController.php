@@ -83,8 +83,10 @@ class DoctorController extends Controller
         ]);
 
         $todayVisits = Visit::with('patient')
-            ->whereDate('visit_date', '>=', now()->subDays(2)->toDateString())
-            ->whereDate('visit_date', '<=', now()->toDateString())
+            ->whereBetween('visit_date', [
+                now()->subDays(2)->toDateString(),
+                now()->toDateString()
+            ])
             ->orderByDesc('visit_date')
             ->orderBy('visit_time')
             ->get();
